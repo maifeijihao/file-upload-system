@@ -18,7 +18,10 @@
 TOKEN="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"
 curl -H "Authorization: token $TOKEN" \
      -H "Accept: application/vnd.github.v3.raw" \
-     -s https://api.github.com/repos/maifeijihao/file-upload-system/contents/upload-install.sh \
+     -H "Cache-Control: no-cache, no-store, must-revalidate" \
+     -H "Pragma: no-cache" \
+     -H "Expires: 0" \
+     -s "https://api.github.com/repos/maifeijihao/file-upload-system/contents/upload-install.sh" \
      -o /tmp/file-upload-install.sh
 
 sudo bash /tmp/file-upload-install.sh
@@ -29,11 +32,15 @@ sudo bash /tmp/file-upload-install.sh
 TOKEN="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"
 curl -H "Authorization: token $TOKEN" \
      -H "Accept: application/vnd.github.v3.raw" \
+     -H "Cache-Control: no-cache, no-store, must-revalidate" \
+     -H "Pragma: no-cache" \
+     -H "Expires: 0" \
      -s "https://api.github.com/repos/maifeijihao/file-upload-system/contents/index.html" \
      -o /opt/file-upload-uuid/index.html
 
 cd /opt/file-upload-uuid && ./restart.sh
 ```
+
 
 
 

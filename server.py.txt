@@ -1,0 +1,122 @@
+from flask import Flask, request, send_file, jsonify, send_from_directory, session
+import os
+import socket
+from config import PASSWORD, START_PORT, find_available_port
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+
+os.makedirs('uploads', exist_ok=True)
+
+def check_login():
+    return session.get('logged_in')
+
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    if data.get('password') == PASSWORD:
+        session['logged_in'] = True
+        return jsonify({'success': True})
+    return jsonify({'success': False})
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({'success': True})
+
+@app.route('/check_auth')
+def check_auth():
+    return jsonify({'authenticated': bool(check_login())})
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if not check_login():
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有文件'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有文件'}), 400
+    
+    # 检查文件类型
+    allowed = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz']
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext == '.gz' and file.filename.lower().endswith('.tar.gz'):
+        ext = '.tar.gz'
+    
+    if ext not in allowed:
+        return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
+    
+    # 保存文件
+    filename = file.filename
+    counter = 1
+    while os.path.exists(os.path.join('uploads', filename)):
+        name, ext = os.path.splitext(file.filename)
+        filename = f"{name}_{counter}{ext}"
+        counter += 1
+    
+    file.save(os.path.join('uploads', filename))
+    
+    # 获取文件大小
+    file_size = os.path.getsize(os.path.join('uploads', filename))
+    
+    return jsonify({
+        'success': True, 
+        'filename': filename,
+        'original_name': file.filename,
+        'size': file_size,
+        'url': f'/download/{filename}'
+    })
+
+@app.route('/files')
+def list_files():
+    if not check_login():
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    
+    files = []
+    for f in os.listdir('uploads'):
+        path = os.path.join('uploads', f)
+        if os.path.isfile(path):
+            size = os.path.getsize(path)
+            files.append({
+                'name': f, 
+                'filename': f, 
+                'size': size,
+                'url': f'/download/{f}'
+            })
+    
+    return jsonify({'success': True, 'files': files})
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    path = os.path.join('uploads', filename)
+    if os.path.exists(path):
+        return send_file(path, as_attachment=True, download_name=filename)
+    return jsonify({'success': False, 'message': '文件不存在'}), 404
+
+if __name__ == '__main__':
+    # 寻找可用端口
+    port = find_available_port(START_PORT)
+    if port is None:
+        print(f"错误：从端口{START_PORT}开始，没有找到可用端口！")
+        exit(1)
+    
+    if port != START_PORT:
+        print(f"端口{START_PORT}被占用，使用端口{port}")
+    
+    print("文件上传系统启动成功！")
+    print(f"访问地址: http://0.0.0.0:{port}")
+    print(f"上传目录: /opt/upload/uploads")
+    print("支持格式: .zip, .rar, .7z, .tar, .gz, .tar.gz")
+    print("最大大小: 1GB")
+    print("=" * 50)
+    
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

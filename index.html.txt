@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>文件上传系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial; }
+        body { background: #f5f7fa; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; }
+        
+        /* 登录框 */
+        .login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .login-box button { background: #1890ff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; width: 100%; }
+        .error { color: red; margin: 10px 0; display: none; }
+        
+        /* 头部 */
+        .header { background: #1890ff; color: white; padding: 20px; text-align: center; }
+        
+        /* 状态栏 */
+        .status-bar { background: #f8f9fa; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .logout-btn { background: #ff4d4f; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; }
+        
+        /* 上传区域 */
+        .upload-area { border: 3px dashed #1890ff; border-radius: 10px; padding: 40px; text-align: center; margin: 20px; cursor: pointer; }
+        .upload-area:hover { background: #f0f7ff; }
+        .file-input { display: none; }
+        
+        /* 文件列表 */
+        .file-list { max-height: 400px; overflow-y: auto; margin: 20px; }
+        .file-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .file-actions { display: flex; gap: 10px; }
+        .file-actions button { padding: 5px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        .copy-btn { background: #52c41a; color: white; }
+        .download-btn { background: #1890ff; color: white; }
+        
+        .empty-message { text-align: center; padding: 40px; color: #999; }
+    </style>
+</head>
+<body>
+    <!-- 登录框 -->
+    <div class="login-modal" id="loginModal">
+        <div class="login-box">
+            <h2>🔐 密码验证</h2>
+            <p>请输入密码访问文件上传系统</p>
+            <input type="password" id="passwordInput" placeholder="输入密码">
+            <div class="error" id="loginError">密码错误</div>
+            <button id="loginBtn">登录</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>📁 文件上传系统</h1>
+        </div>
+        
+        <!-- 状态栏 -->
+        <div class="status-bar" id="statusBar" style="display: none;">
+            <span>👤 已登录</span>
+            <button class="logout-btn" id="logoutBtn">退出登录</button>
+        </div>
+        
+        <!-- 上传区域 -->
+        <div class="upload-area" id="uploadArea" style="display: none;">
+            <h3>📤 拖放或点击上传文件</h3>
+            <p>支持 .zip .rar .7z .tar .gz .tar.gz 格式，最大1GB</p>
+            <button id="browseBtn">选择文件</button>
+            <input type="file" class="file-input" id="fileInput" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
+        </div>
+        
+        <!-- 文件列表 -->
+        <div class="file-list" id="fileList">
+            <div class="empty-message">请先登录</div>
+        </div>
+    </div>
+
+    <script>
+        // DOM元素
+        const loginModal = document.getElementById('loginModal');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginError = document.getElementById('loginError');
+        const statusBar = document.getElementById('statusBar');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const uploadArea = document.getElementById('uploadArea');
+        const browseBtn = document.getElementById('browseBtn');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        
+        // 检查登录状态
+        async function checkAuth() {
+            try {
+                const res = await fetch('/check_auth');
+                const data = await res.json();
+                
+                if (data.authenticated) {
+                    loginModal.style.display = 'none';
+                    statusBar.style.display = 'flex';
+                    uploadArea.style.display = 'block';
+                    loadFiles();
+                }
+            } catch (e) {
+                console.error('检查登录失败:', e);
+            }
+        }
+        
+        // 登录
+        async function login() {
+            const password = passwordInput.value.trim();
+            
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({password})
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    loginError.style.display = 'none';
+                    await checkAuth();
+                } else {
+                    loginError.style.display = 'block';
+                }
+            } catch (e) {
+                loginError.textContent = '网络错误';
+                loginError.style.display = 'block';
+            }
+        }
+        
+        // 退出登录
+        async function logout() {
+            try {
+                await fetch('/logout', {method: 'POST'});
+                location.reload();
+            } catch (e) {
+                console.error('退出失败:', e);
+            }
+        }
+        
+        // 加载文件列表
+        async function loadFiles() {
+            try {
+                const res = await fetch('/files');
+                const data = await res.json();
+                
+                if (data.success) {
+                    renderFiles(data.files);
+                }
+            } catch (e) {
+                console.error('加载文件失败:', e);
+            }
+        }
+        
+        // 渲染文件列表
+        function renderFiles(files) {
+            if (files.length === 0) {
+                fileList.innerHTML = '<div class="empty-message">暂无文件</div>';
+                return;
+            }
+            
+            let html = '';
+            files.forEach(file => {
+                const size = formatSize(file.size);
+                html += `
+                    <div class="file-item">
+                        <div>
+                            <div>${file.name}</div>
+                            <div style="color:#666;font-size:14px;">${size}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="copy-btn" onclick="copyLink('${file.filename}')">复制链接</button>
+                            <button class="download-btn" onclick="downloadFile('${file.filename}')">下载</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            fileList.innerHTML = html;
+        }
+        
+        // 格式化大小
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+            if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+            return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
+        }
+        
+        // 复制链接
+        async function copyLink(filename) {
+            const url = window.location.origin + '/download/' + filename;
+            try {
+                await navigator.clipboard.writeText(url);
+                alert('链接已复制');
+            } catch (e) {
+                prompt('请手动复制链接:', url);
+            }
+        }
+        
+        // 下载文件
+        function downloadFile(filename) {
+            window.open('/download/' + filename, '_blank');
+        }
+        
+        // 上传文件
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert('上传成功');
+                    loadFiles();
+                } else {
+                    alert('上传失败: ' + data.message);
+                }
+            } catch (e) {
+                alert('网络错误');
+            }
+        }
+        
+        // 事件监听
+        loginBtn.onclick = login;
+        passwordInput.onkeypress = (e) => e.key === 'Enter' && login();
+        logoutBtn.onclick = logout;
+        browseBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            for (let file of e.target.files) {
+                uploadFile(file);
+            }
+            e.target.value = '';
+        };
+        
+        // 拖放上传
+        uploadArea.ondragover = (e) => e.preventDefault();
+        uploadArea.ondrop = (e) => {
+            e.preventDefault();
+            for (let file of e.dataTransfer.files) {
+                uploadFile(file);
+            }
+        };
+        
+        // 初始化
+        checkAuth();
+    </script>
+</body>
+</html>

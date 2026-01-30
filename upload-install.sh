@@ -1172,10 +1172,20 @@ cat > $PROJECT_ROOT/index.html << HTML_END
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
                 });
-                return await response.json();
+                
+                console.log('登录响应状态:', response.status);
+                const responseText = await response.text();
+                console.log('登录响应文本:', responseText);
+                
+                try {
+                    return JSON.parse(responseText);
+                } catch (e) {
+                    console.error('JSON解析失败:', e);
+                    return { success: false, message: '服务器响应格式错误' };
+                }
             } catch (error) {
                 console.error('登录失败:', error);
-                return { success: false, message: '网络错误' };
+                return { success: false, message: '网络错误: ' + error.message };
             }
         }
         

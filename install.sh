@@ -1,69 +1,69 @@
 #!/bin/bash
 
-echo "°²×°ÎÄ¼şÉÏ´«ÏµÍ³£¨´ø¶Ë¿ÚÉ¨Ãè£©..."
+echo "å®‰è£…æ–‡ä»¶ä¸Šä¼ ç³»ç»Ÿï¼ˆå¸¦ç«¯å£æ‰«æï¼‰..."
 echo "=================================="
 
-# ¼ì²érootÈ¨ÏŞ
-[ "$EUID" -ne 0 ] && echo "ÇëÊ¹ÓÃ sudo ÔËĞĞ" && exit 1
+# æ£€æŸ¥rootæƒé™
+[ "$EUID" -ne 0 ] && echo "è¯·ä½¿ç”¨ sudo è¿è¡Œ" && exit 1
 
-# °²×°ÒÀÀµ
+# å®‰è£…ä¾èµ–
 apt-get update
 apt-get install -y python3 python3-pip
 pip3 install flask
 
-# ´´½¨Ä¿Â¼
+# åˆ›å»ºç›®å½•
 mkdir -p /opt/upload/uploads
 cd /opt/upload
 
-# ÉèÖÃÃÜÂë
-read -sp "ÉèÖÃ·ÃÎÊÃÜÂë: " PASS
+# è®¾ç½®å¯†ç 
+read -sp "è®¾ç½®è®¿é—®å¯†ç : " PASS
 echo
-read -sp "È·ÈÏÃÜÂë: " PASS2
+read -sp "ç¡®è®¤å¯†ç : " PASS2
 echo
-[ "$PASS" != "$PASS2" ] && echo "ÃÜÂë²»Ò»ÖÂ" && exit 1
+[ "$PASS" != "$PASS2" ] && echo "å¯†ç ä¸ä¸€è‡´" && exit 1
 
-# ÉèÖÃÆğÊ¼¶Ë¿Ú
-read -p "ÆğÊ¼¶Ë¿ÚºÅ (Ä¬ÈÏ5000): " START_PORT
+# è®¾ç½®èµ·å§‹ç«¯å£
+read -p "èµ·å§‹ç«¯å£å· (é»˜è®¤5000): " START_PORT
 START_PORT=${START_PORT:-5000}
 
-# ÏÂÔØÆäËûÎÄ¼ş
-echo "ÏÂÔØÅäÖÃÎÄ¼ş..."
+# ä¸‹è½½å…¶ä»–æ–‡ä»¶
+echo "ä¸‹è½½é…ç½®æ–‡ä»¶..."
 curl -s https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/config.py -o config.py
 sed -i "s/PASSWORD = \"\"/PASSWORD = \"$PASS\"/" config.py
 sed -i "s/START_PORT = 5000/START_PORT = $START_PORT/" config.py
 
-echo "ÏÂÔØ·şÎñÆ÷ÎÄ¼ş..."
+echo "ä¸‹è½½æœåŠ¡å™¨æ–‡ä»¶..."
 curl -s https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/server.py -o server.py
 
-echo "ÏÂÔØÇ°¶ËÎÄ¼ş..."
+echo "ä¸‹è½½å‰ç«¯æ–‡ä»¶..."
 curl -s https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/index.html -o index.html
 
-echo "ÏÂÔØ¹ÜÀí½Å±¾..."
+echo "ä¸‹è½½ç®¡ç†è„šæœ¬..."
 curl -s https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/manage.sh -o manage.sh
 chmod +x manage.sh
 
 curl -s https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/change-password.sh -o change-password.sh
 chmod +x change-password.sh
 
-# ÉèÖÃÄ¿Â¼È¨ÏŞ
+# è®¾ç½®ç›®å½•æƒé™
 chmod 777 /opt/upload/uploads
 
-# »ñÈ¡IPµØÖ·
+# è·å–IPåœ°å€
 IP=$(hostname -I | awk '{print $1}')
 
 echo ""
-echo "°²×°Íê³É£¡"
+echo "å®‰è£…å®Œæˆï¼"
 echo "=========="
-echo "°²×°Ä¿Â¼: /opt/upload"
-echo "ÉÏ´«Ä¿Â¼: /opt/upload/uploads"
-echo "ÆğÊ¼¶Ë¿Ú: $START_PORT (Èç¹û±»Õ¼ÓÃ»á×Ô¶¯Ñ°ÕÒ¿ÉÓÃ¶Ë¿Ú)"
-echo "·ÃÎÊÃÜÂë: $PASS"
+echo "å®‰è£…ç›®å½•: /opt/upload"
+echo "ä¸Šä¼ ç›®å½•: /opt/upload/uploads"
+echo "èµ·å§‹ç«¯å£: $START_PORT (å¦‚æœè¢«å ç”¨ä¼šè‡ªåŠ¨å¯»æ‰¾å¯ç”¨ç«¯å£)"
+echo "è®¿é—®å¯†ç : $PASS"
 echo ""
-echo "Æô¶¯ÃüÁî:"
+echo "å¯åŠ¨å‘½ä»¤:"
 echo "cd /opt/upload && python3 server.py"
 echo ""
-echo "»òÊ¹ÓÃ¹ÜÀí½Å±¾:"
+echo "æˆ–ä½¿ç”¨ç®¡ç†è„šæœ¬:"
 echo "cd /opt/upload && ./manage.sh start"
 echo ""
-echo "ĞŞ¸ÄÃÜÂë:"
+echo "ä¿®æ”¹å¯†ç :"
 echo "cd /opt/upload && sudo ./change-password.sh"

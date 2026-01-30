@@ -202,23 +202,12 @@
         .file-info {
             display: flex;
             align-items: center;
-            gap: 15px;
-        }
-        
-        .file-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #4a90e2 0%, #9b59b6 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
+            gap: 0;
         }
         
         .file-details {
             flex: 1;
+            margin-left: 0;
         }
         
         .file-name {
@@ -822,14 +811,6 @@
             const fileExt = getFileExtension(fileName).toLowerCase();
             const fileSizeFormatted = formatFileSize(fileSize || 0);
             
-            // 根据文件类型设置图标
-            let fileIcon = '📄';
-            if (fileExt === '.zip') fileIcon = '🗜️';
-            else if (fileExt === '.rar') fileIcon = '🗃️';
-            else if (fileExt === '.7z') fileIcon = '🗄️';
-            else if (fileExt === '.tar' || fileExt === '.tar.gz') fileIcon = '📦';
-            else if (fileExt === '.gz') fileIcon = '💨';
-            
             // 状态文本
             let statusText = '';
             let statusClass = '';
@@ -860,10 +841,10 @@
                 </div>
             ` : '';
             
+            // 移除了图标部分
             return `
                 <div class="file-item" data-id="${fileId}">
                     <div class="file-info">
-                        <div class="file-icon">${fileIcon}</div>
                         <div class="file-details">
                             <div class="file-name" title="${fileName}">
                                 ${fileName}
@@ -1271,3 +1252,4 @@
     </script>
 </body>
 </html>
+

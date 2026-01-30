@@ -27,7 +27,7 @@ sudo bash /tmp/file-upload-install.sh
 
 
 
-### 第二步：
+### 第一步：
 ```bash
 TOKEN="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"
 
@@ -39,4 +39,5 @@ curl -H "Authorization: token $TOKEN" \
 
 # 运行脚本
 cd /opt/file-upload-uuid && ./restart.sh
+
 

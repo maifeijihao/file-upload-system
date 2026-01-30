@@ -1,16 +1,18 @@
-cat > setup-upload-uuid.sh << 'SCRIPT_EOF'
 #!/bin/bash
 
 echo "========================================"
-echo "文件上传系统安装脚本 (UUID版本)"
+echo "文件上传系统安装脚本 (UUID版本) - 含防火墙配置"
 echo "========================================"
 echo ""
 
 # 检查是否以root运行
 if [ "$EUID" -ne 0 ]; then 
-    echo "请使用 sudo 运行此脚本: sudo ./setup-upload-uuid.sh"
+    echo "请使用 sudo 运行此脚本: sudo $0"
     exit 1
 fi
+
+# 定义项目根目录
+PROJECT_ROOT="/opt/file-upload-uuid"
 
 # 更新系统并安装必要软件
 echo "1. 正在更新系统和安装必要软件..."
@@ -20,8 +22,8 @@ pip3 install flask
 
 # 创建项目目录
 echo "2. 正在创建项目目录..."
-mkdir -p /opt/file-upload-uuid/uploads
-cd /opt/file-upload-uuid
+mkdir -p $PROJECT_ROOT/uploads
+cd $PROJECT_ROOT
 
 # 设置访问密码
 echo "3. 设置访问密码..."
@@ -44,8 +46,8 @@ fi
 # 设置端口
 echo ""
 echo "4. 设置服务器端口..."
-read -p "请输入端口号（默认3721）: " INPUT_PORT
-DEFAULT_PORT=${INPUT_PORT:-3721}
+read -p "请输入端口号（默认5555）: " INPUT_PORT
+DEFAULT_PORT=${INPUT_PORT:-5555}
 
 if ! [[ "$DEFAULT_PORT" =~ ^[0-9]+$ ]] ; then
     echo "错误：端口必须是数字！"
@@ -57,9 +59,230 @@ if [ "$DEFAULT_PORT" -lt 1024 ] || [ "$DEFAULT_PORT" -gt 65535 ]; then
     exit 1
 fi
 
+# 配置防火墙
+echo "5. 配置系统防火墙..."
+echo ""
+echo "检测并配置防火墙规则..."
+
+# 检查ufw防火墙
+if command -v ufw >/dev/null 2>&1; then
+    echo "检测到 ufw 防火墙，正在配置..."
+    # 检查端口是否已开放
+    if ufw status | grep -q "$DEFAULT_PORT/tcp"; then
+        echo "端口 $DEFAULT_PORT 已在防火墙中开放"
+    else
+        echo "正在开放端口 $DEFAULT_PORT..."
+        ufw allow $DEFAULT_PORT/tcp
+        echo "✅ 端口 $DEFAULT_PORT 已添加到防火墙规则"
+    fi
+    
+    # 检查ufw状态
+    UFW_STATUS=$(ufw status | grep -i "status" | awk '{print $2}')
+    if [ "$UFW_STATUS" = "inactive" ]; then
+        echo "⚠️  ufw防火墙当前处于禁用状态"
+        echo "   需要启用防火墙才能生效"
+        read -p "是否立即启用ufw防火墙？(y/N): " ENABLE_UFW
+        
+        if [[ "$ENABLE_UFW" =~ ^[Yy]$ ]]; then
+            # 启用ufw并设置默认策略
+            ufw --force enable
+            echo "✅ ufw防火墙已启用"
+        else
+            echo "跳过启用防火墙，请手动启用或使用其他防火墙管理工具"
+        fi
+    else
+        echo "✅ ufw防火墙已启用，端口 $DEFAULT_PORT 已开放"
+    fi
+else
+    echo "未检测到 ufw 防火墙，尝试检查 iptables..."
+    
+    # 检查iptables
+    if command -v iptables >/dev/null 2>&1; then
+        echo "检测到 iptables，尝试添加规则..."
+        
+        # 检查是否已有规则
+        if iptables -L INPUT -n | grep -q "tcp dpt:$DEFAULT_PORT"; then
+            echo "端口 $DEFAULT_PORT 已在 iptables 规则中"
+        else
+            echo "正在添加 iptables 规则..."
+            iptables -A INPUT -p tcp --dport $DEFAULT_PORT -j ACCEPT
+            echo "✅ iptables 规则已添加"
+            
+            # 询问是否保存iptables规则
+            read -p "是否保存iptables规则？(需要iptables-persistent)(y/N): " SAVE_IPTABLES
+            
+            if [[ "$SAVE_IPTABLES" =~ ^[Yy]$ ]]; then
+                if command -v iptables-save >/dev/null 2>&1; then
+                    # 尝试保存规则
+                    iptables-save > /etc/iptables/rules.v4
+                    echo "✅ iptables规则已保存"
+                else
+                    echo "⚠️  未找到iptables-save命令，无法保存规则"
+                    echo "   重启后规则将失效，请手动保存或安装iptables-persistent"
+                fi
+            fi
+        fi
+    else
+        echo "未检测到 iptables，跳过防火墙配置"
+    fi
+fi
+
+# 创建防火墙管理脚本
+echo "6. 创建防火墙管理脚本..."
+cat > $PROJECT_ROOT/firewall-setup.sh << FIREWALL_EOF
+#!/bin/bash
+echo "=== 防火墙配置工具 ==="
+echo ""
+
+if [ "\$EUID" -ne 0 ]; then 
+    echo "请使用 sudo 运行此脚本: sudo ./firewall-setup.sh"
+    exit 1
+fi
+
+PORT=\$(grep "DEFAULT_PORT = " config.py | cut -d'=' -f2 | tr -d ' ')
+
+if [ -z "\$PORT" ]; then
+    echo "错误：无法从配置文件中获取端口号"
+    exit 1
+fi
+
+echo "检测到配置端口: \$PORT"
+echo ""
+echo "请选择操作:"
+echo "1. 开放端口 \$PORT (允许外部访问)"
+echo "2. 关闭端口 \$PORT (禁止外部访问)"
+echo "3. 检查当前防火墙状态"
+echo "4. 显示当前端口状态"
+echo "5. 退出"
+echo ""
+read -p "请输入选择 (1-5): " CHOICE
+
+case \$CHOICE in
+    1)
+        echo "正在开放端口 \$PORT..."
+        
+        # 检查并配置ufw
+        if command -v ufw >/dev/null 2>&1; then
+            ufw allow \$PORT/tcp
+            echo "✅ 已添加ufw规则"
+            
+            # 检查ufw状态
+            UFW_STATUS=\$(ufw status | grep -i "status" | awk '{print \$2}')
+            if [ "\$UFW_STATUS" = "inactive" ]; then
+                echo "⚠️  ufw防火墙当前处于禁用状态"
+                read -p "是否启用ufw防火墙？(y/N): " ENABLE
+                if [[ "\$ENABLE" =~ ^[Yy]$ ]]; then
+                    ufw --force enable
+                    echo "✅ ufw防火墙已启用"
+                fi
+            fi
+        fi
+        
+        # 检查并配置iptables
+        if command -v iptables >/dev/null 2>&1; then
+            if ! iptables -L INPUT -n | grep -q "tcp dpt:\$PORT"; then
+                iptables -A INPUT -p tcp --dport \$PORT -j ACCEPT
+                echo "✅ 已添加iptables规则"
+                
+                # 询问是否保存
+                read -p "是否保存iptables规则？(y/N): " SAVE
+                if [[ "\$SAVE" =~ ^[Yy]$ ]] && command -v iptables-save >/dev/null 2>&1; then
+                    iptables-save > /etc/iptables/rules.v4 2>/dev/null && echo "✅ 规则已保存" || echo "⚠️  保存失败"
+                fi
+            else
+                echo "端口 \$PORT 已在iptables规则中"
+            fi
+        fi
+        
+        echo ""
+        echo "✅ 端口 \$PORT 已配置完成"
+        echo "注意：云服务器还需要在控制台安全组中开放此端口"
+        ;;
+        
+    2)
+        echo "正在关闭端口 \$PORT..."
+        
+        if command -v ufw >/dev/null 2>&1; then
+            ufw delete allow \$PORT/tcp 2>/dev/null
+            echo "✅ 已移除ufw规则"
+        fi
+        
+        if command -v iptables >/dev/null 2>&1; then
+            iptables -D INPUT -p tcp --dport \$PORT -j ACCEPT 2>/dev/null
+            echo "✅ 已移除iptables规则"
+            
+            # 保存iptables规则
+            if command -v iptables-save >/dev/null 2>&1; then
+                iptables-save > /etc/iptables/rules.v4 2>/dev/null
+            fi
+        fi
+        
+        echo "✅ 端口 \$PORT 已关闭"
+        ;;
+        
+    3)
+        echo "=== 防火墙状态 ==="
+        
+        if command -v ufw >/dev/null 2>&1; then
+            echo "ufw状态:"
+            ufw status
+            echo ""
+        fi
+        
+        if command -v iptables >/dev/null 2>&1; then
+            echo "iptables规则 (端口相关):"
+            iptables -L INPUT -n | grep "tcp" | grep "dpt"
+        fi
+        ;;
+        
+    4)
+        echo "=== 端口 \$PORT 状态 ==="
+        
+        # 检查监听状态
+        echo "监听状态:"
+        if netstat -tln 2>/dev/null | grep -q ":\$PORT "; then
+            echo "✅ 端口 \$PORT 正在监听"
+            netstat -tln | grep ":\$PORT "
+        else
+            echo "❌ 端口 \$PORT 未监听"
+        fi
+        
+        # 检查防火墙规则
+        echo ""
+        echo "防火墙规则:"
+        
+        if command -v ufw >/dev/null 2>&1; then
+            if ufw status | grep -q "\$PORT/tcp"; then
+                echo "✅ ufw: 端口 \$PORT 已开放"
+            else
+                echo "❌ ufw: 端口 \$PORT 未开放"
+            fi
+        fi
+        
+        if command -v iptables >/dev/null 2>&1; then
+            if iptables -L INPUT -n | grep -q "tcp dpt:\$PORT"; then
+                echo "✅ iptables: 端口 \$PORT 已开放"
+            else
+                echo "❌ iptables: 端口 \$PORT 未开放"
+            fi
+        fi
+        ;;
+        
+    5)
+        echo "退出"
+        ;;
+        
+    *)
+        echo "无效选择"
+        ;;
+esac
+FIREWALL_EOF
+
+chmod +x $PROJECT_ROOT/firewall-setup.sh
+
 # 创建配置文件
-echo "5. 创建配置文件..."
-cat > config.py << CONFIG_END
+echo "7. 创建配置文件..."
+cat > $PROJECT_ROOT/config.py << CONFIG_END
 import hashlib
 import socket
 
@@ -95,15 +318,14 @@ def find_available_port(start_port):
 CONFIG_END
 
 # 创建UUID版本的后端服务器
-echo "6. 正在创建后端服务器 (UUID版本)..."
-cat > server.py << SERVER_END
+echo "8. 正在创建后端服务器 (UUID版本)..."
+cat > $PROJECT_ROOT/server.py << SERVER_END
 from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
 import hashlib
 import socket
 import uuid
 import json
-from werkzeug.utils import secure_filename
 from config import verify_password, find_available_port, DEFAULT_PORT
 
 app = Flask(__name__)
@@ -329,12 +551,6 @@ def download_file(filename):
         # 设置下载时的文件名
         download_name = original_filename
         
-        # 如果原始文件名包含中文，确保编码正确
-        try:
-            download_name = download_name.encode('utf-8').decode('iso-8859-1')
-        except:
-            pass
-        
         return send_file(
             path,
             as_attachment=True,
@@ -355,9 +571,10 @@ if __name__ == '__main__':
         print(f"端口{DEFAULT_PORT}被占用，使用端口{port}")
     
     print("文件上传系统启动成功！(UUID版本)")
-    print("访问地址: http://0.0.0.0:%s" % port)
-    print("上传目录: /opt/file-upload-uuid/uploads")
-    print("文件映射: /opt/file-upload-uuid/file_mapping.json")
+    print(f"项目目录: {os.path.dirname(os.path.abspath(__file__))}")
+    print(f"访问地址: http://0.0.0.0:{port}")
+    print(f"上传目录: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')}")
+    print(f"文件映射: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file_mapping.json')}")
     print("")
     print("✅ 文件上传系统已启用UUID文件名模式！")
     print("   上传的文件会自动重命名为UUID格式，但下载时仍显示原始文件名。")
@@ -367,8 +584,8 @@ if __name__ == '__main__':
 SERVER_END
 
 # 创建简单的提示页面
-echo "7. 创建简单的提示页面..."
-cat > index.html << HTML_END
+echo "9. 创建简单的提示页面..."
+cat > $PROJECT_ROOT/index.html << HTML_END
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1454,42 +1671,42 @@ cat > index.html << HTML_END
 HTML_END
 
 # 创建启动脚本
-echo "8. 创建启动脚本..."
-cat > start.sh << 'START_END'
+echo "10. 创建启动脚本..."
+cat > $PROJECT_ROOT/start.sh << START_EOF
 #!/bin/bash
-cd /opt/file-upload-uuid
+cd $PROJECT_ROOT
 python3 server.py
-START_END
+START_EOF
 
-chmod +x start.sh
+chmod +x $PROJECT_ROOT/start.sh
 
 # 创建停止脚本
-echo "9. 创建停止脚本..."
-cat > stop.sh << 'STOP_END'
+echo "11. 创建停止脚本..."
+cat > $PROJECT_ROOT/stop.sh << STOP_EOF
 #!/bin/bash
 echo "正在停止文件上传系统..."
 pkill -f "python3 server.py" 2>/dev/null
 sleep 2
 echo "已停止"
-STOP_END
+STOP_EOF
 
-chmod +x stop.sh
+chmod +x $PROJECT_ROOT/stop.sh
 
 # 创建重启脚本
-echo "10. 创建重启脚本..."
-cat > restart.sh << 'RESTART_END'
+echo "12. 创建重启脚本..."
+cat > $PROJECT_ROOT/restart.sh << RESTART_EOF
 #!/bin/bash
-cd /opt/file-upload-uuid
+cd $PROJECT_ROOT
 ./stop.sh
 sleep 1
 ./start.sh
-RESTART_END
+RESTART_EOF
 
-chmod +x restart.sh
+chmod +x $PROJECT_ROOT/restart.sh
 
 # 创建修改密码脚本
-echo "11. 创建密码修改脚本..."
-cat > change-password.sh << 'CHANGE_PASS_END'
+echo "13. 创建密码修改脚本..."
+cat > $PROJECT_ROOT/change-password.sh << CHANGE_PASS_EOF
 #!/bin/bash
 
 if [ "$EUID" -ne 0 ]; then 
@@ -1497,7 +1714,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-cd /opt/file-upload-uuid
+cd $PROJECT_ROOT
 
 echo "=== 修改文件上传系统密码 ==="
 echo ""
@@ -1558,14 +1775,14 @@ echo "✅ 密码修改成功！"
 echo "需要重启服务才能使新密码生效。"
 echo ""
 echo "重启命令:"
-echo "cd /opt/file-upload-uuid && ./restart.sh"
-CHANGE_PASS_END
+echo "cd $PROJECT_ROOT && ./restart.sh"
+CHANGE_PASS_EOF
 
-chmod +x change-password.sh
+chmod +x $PROJECT_ROOT/change-password.sh
 
 # 创建查看状态脚本
-echo "12. 创建查看状态脚本..."
-cat > status.sh << 'STATUS_END'
+echo "14. 创建查看状态脚本..."
+cat > $PROJECT_ROOT/status.sh << STATUS_EOF
 #!/bin/bash
 echo "=== 文件上传系统状态 (UUID版本) ==="
 echo ""
@@ -1598,24 +1815,45 @@ if pgrep -f "python3 server.py" > /dev/null; then
     fi
     
     # 统计上传文件
-    if [ -d "/opt/file-upload-uuid/uploads" ]; then
-        FILE_COUNT=$(ls /opt/file-upload-uuid/uploads/ 2>/dev/null | wc -l)
+    if [ -d "$PROJECT_ROOT/uploads" ]; then
+        FILE_COUNT=$(ls $PROJECT_ROOT/uploads/ 2>/dev/null | wc -l)
         echo "📁 文件数量: $FILE_COUNT"
         
-        TOTAL_SIZE=$(du -sh /opt/file-upload-uuid/uploads 2>/dev/null | cut -f1)
+        TOTAL_SIZE=$(du -sh $PROJECT_ROOT/uploads 2>/dev/null | cut -f1)
         echo "💾 总大小: $TOTAL_SIZE"
     fi
     
     # 检查映射文件
-    if [ -f "/opt/file-upload-uuid/file_mapping.json" ]; then
-        MAPPING_COUNT=$(grep -c '"original_name"' /opt/file-upload-uuid/file_mapping.json 2>/dev/null || echo "0")
+    if [ -f "$PROJECT_ROOT/file_mapping.json" ]; then
+        MAPPING_COUNT=$(grep -c '"original_name"' $PROJECT_ROOT/file_mapping.json 2>/dev/null || echo "0")
         echo "🗂️  文件映射: $MAPPING_COUNT 条记录"
     fi
+    
+    # 检查防火墙状态
+    echo ""
+    echo "=== 防火墙状态 ==="
+    
+    if command -v ufw >/dev/null 2>&1; then
+        if ufw status | grep -q "$PORT/tcp"; then
+            echo "✅ ufw: 端口 $PORT 已开放"
+        else
+            echo "❌ ufw: 端口 $PORT 未开放"
+        fi
+    fi
+    
+    if command -v iptables >/dev/null 2>&1; then
+        if iptables -L INPUT -n 2>/dev/null | grep -q "tcp dpt:$PORT"; then
+            echo "✅ iptables: 端口 $PORT 已开放"
+        else
+            echo "❌ iptables: 端口 $PORT 未开放"
+        fi
+    fi
+    
 else
     echo "❌ 服务状态: 未运行"
     echo ""
     echo "启动命令:"
-    echo "cd /opt/file-upload-uuid && ./start.sh"
+    echo "cd $PROJECT_ROOT && ./start.sh"
 fi
 
 echo ""
@@ -1624,87 +1862,15 @@ echo "- 启动: ./start.sh"
 echo "- 停止: ./stop.sh"
 echo "- 重启: ./restart.sh"
 echo "- 修改密码: sudo ./change-password.sh"
-STATUS_END
+echo "- 防火墙管理: sudo ./firewall-setup.sh"
+echo "- 清理文件: ./cleanup.sh"
+STATUS_EOF
 
-chmod +x status.sh
-
-# 创建迁移脚本（如果需要从旧系统迁移）
-echo "13. 创建迁移脚本..."
-cat > migrate-old-files.sh << 'MIGRATE_END'
-#!/bin/bash
-echo "=== 迁移旧文件到UUID系统 ==="
-
-OLD_DIR="/opt/file-upload"
-NEW_DIR="/opt/file-upload-uuid"
-
-if [ ! -d "$OLD_DIR/uploads" ]; then
-    echo "❌ 未找到旧文件系统"
-    exit 1
-fi
-
-if [ ! -d "$NEW_DIR/uploads" ]; then
-    mkdir -p "$NEW_DIR/uploads"
-fi
-
-echo "正在扫描旧文件..."
-OLD_FILES_COUNT=$(ls "$OLD_DIR/uploads/" 2>/dev/null | wc -l)
-
-if [ "$OLD_FILES_COUNT" -eq 0 ]; then
-    echo "没有需要迁移的旧文件"
-    exit 0
-fi
-
-echo "发现 $OLD_FILES_COUNT 个旧文件"
-
-# 创建映射文件
-MAPPING_FILE="$NEW_DIR/file_mapping.json"
-MAPPINGS="{"
-
-count=0
-for old_file in "$OLD_DIR"/uploads/*; do
-    if [ -f "$old_file" ]; then
-        filename=$(basename "$old_file")
-        file_size=$(stat -c%s "$old_file")
-        
-        # 生成UUID新文件名
-        ext="${filename##*.}"
-        if [[ "$filename" =~ \.tar\.gz$ ]]; then
-            ext="tar.gz"
-        fi
-        
-        new_uuid=$(uuidgen)
-        new_filename="${new_uuid}.${ext}"
-        
-        # 复制文件
-        cp "$old_file" "$NEW_DIR/uploads/$new_filename"
-        
-        # 添加到映射
-        if [ $count -gt 0 ]; then
-            MAPPINGS="$MAPPINGS,"
-        fi
-        MAPPINGS="$MAPPINGS\n  \"$new_filename\": {\"original_name\": \"$filename\", \"size\": $file_size}"
-        
-        count=$((count + 1))
-        echo "迁移: $filename -> $new_filename"
-    fi
-done
-
-MAPPINGS="$MAPPINGS\n}"
-
-# 保存映射文件
-echo -e "$MAPPINGS" > "$MAPPING_FILE"
-
-echo ""
-echo "✅ 迁移完成！"
-echo "   迁移了 $count 个文件"
-echo "   映射文件: $MAPPING_FILE"
-MIGRATE_END
-
-chmod +x migrate-old-files.sh
+chmod +x $PROJECT_ROOT/status.sh
 
 # 创建清理脚本
-echo "14. 创建清理脚本..."
-cat > cleanup.sh << 'CLEANUP_END'
+echo "15. 创建清理脚本..."
+cat > $PROJECT_ROOT/cleanup.sh << CLEANUP_EOF
 #!/bin/bash
 echo "=== 清理文件上传系统 ==="
 echo "警告：此操作将删除所有上传的文件！"
@@ -1717,7 +1883,7 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     exit 0
 fi
 
-cd /opt/file-upload-uuid
+cd $PROJECT_ROOT
 
 # 停止服务
 ./stop.sh
@@ -1732,15 +1898,15 @@ mkdir -p uploads
 echo ""
 echo "✅ 所有文件已清理！"
 echo "现在可以重新启动服务:"
-echo "cd /opt/file-upload-uuid && ./start.sh"
-CLEANUP_END
+echo "cd $PROJECT_ROOT && ./start.sh"
+CLEANUP_EOF
 
-chmod +x cleanup.sh
+chmod +x $PROJECT_ROOT/cleanup.sh
 
 # 设置目录权限
-echo "15. 设置目录权限..."
-chmod -R 755 /opt/file-upload-uuid
-chmod 777 /opt/file-upload-uuid/uploads
+echo "16. 设置目录权限..."
+chmod -R 755 $PROJECT_ROOT
+chmod 777 $PROJECT_ROOT/uploads
 
 # 获取服务器IP
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
@@ -1753,32 +1919,35 @@ echo ""
 echo "重要信息："
 echo "1. 你设置的密码为: $PASSWORD"
 echo "2. 起始端口设置为: $DEFAULT_PORT"
-echo "3. 系统使用UUID文件名存储文件"
+echo "3. 项目目录: $PROJECT_ROOT"
+echo "4. 系统使用UUID文件名存储文件"
 echo "   - 前端显示：原始文件名"
 echo "   - 下载链接：UUID格式"
 echo "   - 下载时显示：原始文件名"
 echo ""
-echo "管理命令:"
-echo "- 查看状态: ./status.sh"
-echo "- 启动服务: ./start.sh"
-echo "- 停止服务: ./stop.sh"
-echo "- 重启服务: ./restart.sh"
-echo "- 修改密码: sudo ./change-password.sh"
-echo "- 清理文件: ./cleanup.sh"
-echo "- 迁移旧文件: ./migrate-old-files.sh"
+echo "防火墙配置："
+echo "✅ 已尝试自动配置系统防火墙"
+echo "⚠️  如果仍无法访问，请检查："
+echo "   1. 云服务器安全组（控制台）"
+echo "   2. 使用防火墙管理工具: sudo ./firewall-setup.sh"
 echo ""
-echo "安装目录: /opt/file-upload-uuid"
-echo "上传目录: /opt/file-upload-uuid/uploads"
-echo "映射文件: /opt/file-upload-uuid/file_mapping.json"
+echo "管理命令:"
+echo "- 查看状态: cd $PROJECT_ROOT && ./status.sh"
+echo "- 启动服务: cd $PROJECT_ROOT && ./start.sh"
+echo "- 停止服务: cd $PROJECT_ROOT && ./stop.sh"
+echo "- 重启服务: cd $PROJECT_ROOT && ./restart.sh"
+echo "- 修改密码: cd $PROJECT_ROOT && sudo ./change-password.sh"
+echo "- 防火墙管理: cd $PROJECT_ROOT && sudo ./firewall-setup.sh"
+echo "- 清理文件: cd $PROJECT_ROOT && ./cleanup.sh"
+echo ""
+echo "安装目录: $PROJECT_ROOT"
+echo "上传目录: $PROJECT_ROOT/uploads"
+echo "映射文件: $PROJECT_ROOT/file_mapping.json"
 echo ""
 echo "现在可以启动服务了："
-echo "cd /opt/file-upload-uuid && ./start.sh"
+echo "cd $PROJECT_ROOT && ./start.sh"
 echo ""
 echo "访问地址: http://$IP_ADDRESS:$DEFAULT_PORT"
-SCRIPT_EOF
-
-# 给脚本执行权限
-chmod +x setup-upload-uuid.sh
-
-echo "✅ UUID版本安装脚本创建完成！"
-echo "请运行: sudo ./setup-upload-uuid.sh"
+echo ""
+echo "如果无法访问，请运行防火墙检查："
+echo "cd $PROJECT_ROOT && sudo ./firewall-setup.sh"

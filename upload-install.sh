@@ -583,6 +583,134 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=port, debug=False)
 SERVER_END
 
+# 创建简单的提示页面
+echo "9. 创建简单的提示页面..."
+cat > $PROJECT_ROOT/index.html << HTML_END
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>文件上传系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #4a90e2;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #4a90e2;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .steps {
+            text-align: left;
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+        .steps li {
+            margin: 10px 0;
+        }
+        .code {
+            background-color: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .firewall-note {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📁</div>
+        <h1>文件上传系统</h1>
+        
+        <div class="firewall-note">
+            <strong>防火墙已自动配置！</strong>
+            系统已尝试自动配置防火墙规则。如果无法访问，请检查：
+            <ol>
+                <li>云服务器安全组设置（控制台）</li>
+                <li>系统防火墙状态</li>
+                <li>使用 <span class="code">./firewall-setup.sh</span> 检查配置</li>
+            </ol>
+        </div>
+        
+        <div class="warning-box">
+            <strong>重要提示：</strong>
+            这是一个临时页面，请上传你自己的index.html文件以启用完整功能！
+        </div>
+        
+        <div class="info-box">
+            <h3>系统已安装成功！</h3>
+            <p>后端服务器已启动并运行正常。</p>
+            <p>请按照以下步骤上传你的自定义界面：</p>
+        </div>
+        
+        <div>
+            <h3>安装步骤：</h3>
+            <ol class="steps">
+                <li>将你的 <span class="code">index.html</span> 文件上传到服务器</li>
+                <li>复制到安装目录：<span class="code">sudo cp /path/to/your/index.html $PROJECT_ROOT/</span></li>
+                <li>重启服务：<span class="code">cd $PROJECT_ROOT && ./restart.sh</span></li>
+                <li>刷新此页面查看效果</li>
+            </ol>
+        </div>
+        
+        <div class="info-box">
+            <h3>管理命令：</h3>
+            <ul class="steps">
+                <li>查看状态：<span class="code">./status.sh</span></li>
+                <li>启动服务：<span class="code">./start.sh</span></li>
+                <li>停止服务：<span class="code">./stop.sh</span></li>
+                <li>重启服务：<span class="code">./restart.sh</span></li>
+                <li>修改密码：<span class="code">sudo ./change-password.sh</span></li>
+                <li>防火墙管理：<span class="code">sudo ./firewall-setup.sh</span></li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <p>安装目录：<span class="code">$PROJECT_ROOT</span></p>
+            <p>上传目录：<span class="code">$PROJECT_ROOT/uploads</span></p>
+        </div>
+    </div>
+</body>
+</html>
+HTML_END
+
 # 创建启动脚本
 echo "10. 创建启动脚本..."
 cat > $PROJECT_ROOT/start.sh << START_EOF

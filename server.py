@@ -37,25 +37,25 @@ def check_auth():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if not check_login():
-        return jsonify({'success': False, 'message': 'ÇëÏÈµÇÂ¼'}), 401
+        return jsonify({'success': False, 'message': 'è¯·å…ˆç™»å½•'}), 401
     
     if 'file' not in request.files:
-        return jsonify({'success': False, 'message': 'Ã»ÓĞÎÄ¼ş'}), 400
+        return jsonify({'success': False, 'message': 'æ²¡æœ‰æ–‡ä»¶'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'success': False, 'message': 'Ã»ÓĞÎÄ¼ş'}), 400
+        return jsonify({'success': False, 'message': 'æ²¡æœ‰æ–‡ä»¶'}), 400
     
-    # ¼ì²éÎÄ¼şÀàĞÍ
+    # æ£€æŸ¥æ–‡ä»¶ç±»å‹
     allowed = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz']
     ext = os.path.splitext(file.filename)[1].lower()
     if ext == '.gz' and file.filename.lower().endswith('.tar.gz'):
         ext = '.tar.gz'
     
     if ext not in allowed:
-        return jsonify({'success': False, 'message': '²»Ö§³ÖµÄÎÄ¼ş¸ñÊ½'}), 400
+        return jsonify({'success': False, 'message': 'ä¸æ”¯æŒçš„æ–‡ä»¶æ ¼å¼'}), 400
     
-    # ±£´æÎÄ¼ş
+    # ä¿å­˜æ–‡ä»¶
     filename = file.filename
     counter = 1
     while os.path.exists(os.path.join('uploads', filename)):
@@ -65,7 +65,7 @@ def upload_file():
     
     file.save(os.path.join('uploads', filename))
     
-    # »ñÈ¡ÎÄ¼ş´óĞ¡
+    # è·å–æ–‡ä»¶å¤§å°
     file_size = os.path.getsize(os.path.join('uploads', filename))
     
     return jsonify({
@@ -79,7 +79,7 @@ def upload_file():
 @app.route('/files')
 def list_files():
     if not check_login():
-        return jsonify({'success': False, 'message': 'ÇëÏÈµÇÂ¼'}), 401
+        return jsonify({'success': False, 'message': 'è¯·å…ˆç™»å½•'}), 401
     
     files = []
     for f in os.listdir('uploads'):
@@ -100,23 +100,23 @@ def download_file(filename):
     path = os.path.join('uploads', filename)
     if os.path.exists(path):
         return send_file(path, as_attachment=True, download_name=filename)
-    return jsonify({'success': False, 'message': 'ÎÄ¼ş²»´æÔÚ'}), 404
+    return jsonify({'success': False, 'message': 'æ–‡ä»¶ä¸å­˜åœ¨'}), 404
 
 if __name__ == '__main__':
-    # Ñ°ÕÒ¿ÉÓÃ¶Ë¿Ú
+    # å¯»æ‰¾å¯ç”¨ç«¯å£
     port = find_available_port(START_PORT)
     if port is None:
-        print(f"´íÎó£º´Ó¶Ë¿Ú{START_PORT}¿ªÊ¼£¬Ã»ÓĞÕÒµ½¿ÉÓÃ¶Ë¿Ú£¡")
+        print(f"é”™è¯¯ï¼šä»ç«¯å£{START_PORT}å¼€å§‹ï¼Œæ²¡æœ‰æ‰¾åˆ°å¯ç”¨ç«¯å£ï¼")
         exit(1)
     
     if port != START_PORT:
-        print(f"¶Ë¿Ú{START_PORT}±»Õ¼ÓÃ£¬Ê¹ÓÃ¶Ë¿Ú{port}")
+        print(f"ç«¯å£{START_PORT}è¢«å ç”¨ï¼Œä½¿ç”¨ç«¯å£{port}")
     
-    print("ÎÄ¼şÉÏ´«ÏµÍ³Æô¶¯³É¹¦£¡")
-    print(f"·ÃÎÊµØÖ·: http://0.0.0.0:{port}")
-    print(f"ÉÏ´«Ä¿Â¼: /opt/upload/uploads")
-    print("Ö§³Ö¸ñÊ½: .zip, .rar, .7z, .tar, .gz, .tar.gz")
-    print("×î´ó´óĞ¡: 1GB")
+    print("æ–‡ä»¶ä¸Šä¼ ç³»ç»Ÿå¯åŠ¨æˆåŠŸï¼")
+    print(f"è®¿é—®åœ°å€: http://0.0.0.0:{port}")
+    print(f"ä¸Šä¼ ç›®å½•: /opt/upload/uploads")
+    print("æ”¯æŒæ ¼å¼: .zip, .rar, .7z, .tar, .gz, .tar.gz")
+    print("æœ€å¤§å¤§å°: 1GB")
     print("=" * 50)
     
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

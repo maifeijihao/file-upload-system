@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================"
-echo "文件上传系统安装脚本 (UUID版本) - 新VPS专用"
+echo "文件上传系统安装脚本 (UUID版本) - 修复版"
 echo "========================================"
 echo ""
 
@@ -362,291 +362,159 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=port, debug=False)
 SERVER_END
 
-# 创建简单的提示页面
-echo "7. 创建简单的提示页面..."
+# 创建简化的前端页面（修复登录问题）
+echo "7. 创建简化的前端页面..."
 cat > $PROJECT_ROOT/index.html << HTML_END
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>压缩包上传与下载</title>
+    <title>压缩包上传与下载系统</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
         }
         
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #f5f5f5;
             min-height: 100vh;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
         }
         
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            width: 100%;
-            max-width: 1000px;
-            margin: 40px 20px;
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            font-weight: 300;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1rem;
-        }
-        
-        .main-content {
-            padding: 40px;
-        }
-        
-        /* 密码验证弹窗 */
-        .password-modal {
+        /* 登录弹窗 */
+        .login-modal {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1000;
         }
         
-        .password-box {
+        .login-box {
             background: white;
-            border-radius: 15px;
+            border-radius: 10px;
+            padding: 40px;
             width: 90%;
             max-width: 400px;
-            overflow: hidden;
-            animation: slideIn 0.3s ease;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
         }
         
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .password-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
+        .login-box h2 {
             text-align: center;
+            color: #333;
+            margin-bottom: 30px;
         }
         
-        .password-header h2 {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
-        }
-        
-        .password-body {
-            padding: 30px;
-        }
-        
-        .password-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            transition: border-color 0.3s;
-        }
-        
-        .password-input:focus {
-            border-color: #667eea;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .password-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: transform 0.2s;
-        }
-        
-        .password-btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        .password-error {
-            color: #ff4757;
-            font-size: 14px;
-            margin-top: 10px;
-            text-align: center;
-            display: none;
-        }
-        
-        /* 上传区域 */
-        .upload-section {
-            margin-bottom: 40px;
-        }
-        
-        .upload-box {
-            border: 3px dashed #ddd;
-            border-radius: 15px;
-            padding: 60px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #f8f9fa;
-            position: relative;
-        }
-        
-        .upload-box:hover {
-            border-color: #667eea;
-            background: #f0f2ff;
-        }
-        
-        .upload-box.dragover {
-            border-color: #667eea;
-            background: #e8ebff;
-        }
-        
-        .upload-icon {
-            font-size: 60px;
-            color: #667eea;
+        .form-group {
             margin-bottom: 20px;
         }
         
-        .upload-box h3 {
-            font-size: 1.5rem;
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .login-btn:hover {
+            background: #45a049;
+        }
+        
+        .error-message {
+            color: #f44336;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        /* 主界面 */
+        .main-container {
+            display: none;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
             color: #333;
             margin-bottom: 10px;
         }
         
-        .upload-box p {
-            color: #666;
-            margin-bottom: 20px;
-        }
-        
-        .upload-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.3s;
-        }
-        
-        .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
-        /* 文件列表区域 */
-        .files-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-            margin-top: 30px;
-        }
-        
-        .stats-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding: 20px;
+        .upload-section {
             background: white;
+            padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        .stats {
-            display: flex;
-            gap: 30px;
-        }
-        
-        .stat-item {
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             text-align: center;
         }
         
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            display: block;
-        }
-        
-        .stat-label {
-            font-size: 0.9rem;
-            color: #666;
-        }
-        
-        .file-count { color: #667eea; }
-        .total-size { color: #764ba2; }
-        .success-count { color: #00b894; }
-        .failed-count { color: #ff4757; }
-        
-        .batch-btn {
-            background: #00b894;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
+        .upload-box {
+            border: 3px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px 20px;
             cursor: pointer;
             transition: all 0.3s;
         }
         
-        .batch-btn:hover:not(:disabled) {
-            background: #00a085;
-            transform: translateY(-2px);
+        .upload-box:hover {
+            border-color: #4CAF50;
+            background: #f9f9f9;
         }
         
-        .batch-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+        .upload-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
         }
         
-        /* 文件列表 */
+        .files-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
         .file-list {
-            max-height: 400px;
-            overflow-y: auto;
+            margin-top: 20px;
         }
         
         .file-item {
@@ -654,288 +522,133 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             justify-content: space-between;
             align-items: center;
             padding: 15px;
-            background: white;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            transition: all 0.3s;
-        }
-        
-        .file-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-bottom: 1px solid #eee;
         }
         
         .file-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .file-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-        }
-        
-        .file-details {
             flex: 1;
         }
         
         .file-name {
-            font-weight: 600;
+            font-weight: bold;
             color: #333;
             margin-bottom: 5px;
         }
         
         .file-size {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .file-actions {
-            display: flex;
-            gap: 10px;
+            color: #777;
+            font-size: 14px;
         }
         
         .copy-btn {
-            background: #0984e3;
+            background: #2196F3;
             color: white;
+            padding: 8px 15px;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s;
+            font-size: 14px;
         }
         
-        .copy-btn:hover {
-            background: #0770c4;
-        }
-        
-        .empty-message {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-        
-        /* 进度条 */
-        .progress-container {
-            width: 100%;
-            height: 6px;
-            background: #e0e0e0;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 10px;
-            display: none;
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
         
         .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #f0f0f0;
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: #4CAF50;
             width: 0%;
             transition: width 0.3s;
         }
         
-        /* 认证状态 */
-        .auth-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: 600;
-            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.3);
-            z-index: 100;
-            animation: slideInRight 0.3s ease;
-            display: none;
-        }
-        
-        .logout-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 15px;
-            margin-left: 10px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .container {
-                margin: 20px 10px;
-            }
-            
-            .main-content {
-                padding: 20px;
-            }
-            
-            .stats-bar {
-                flex-direction: column;
-                gap: 20px;
-            }
-            
-            .stats {
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            
-            .file-item {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 15px;
-            }
-            
-            .file-actions {
-                justify-content: flex-end;
-            }
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #999;
         }
     </style>
 </head>
 <body>
-    <!-- 密码验证弹窗 -->
-    <div id="passwordModal" class="password-modal">
-        <div class="password-box">
-            <div class="password-header">
-                <h2>🔒 安全验证</h2>
-                <p>请输入密码访问文件系统</p>
+    <!-- 登录弹窗 -->
+    <div id="loginModal" class="login-modal">
+        <div class="login-box">
+            <h2>🔐 请输入密码</h2>
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" placeholder="输入访问密码">
             </div>
-            <div class="password-body">
-                <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" autocomplete="current-password">
-                <button id="passwordSubmit" class="password-btn">验证并进入</button>
-                <div id="passwordError" class="password-error">密码错误，请重试</div>
-            </div>
+            <button id="loginBtn" class="login-btn">登录</button>
+            <div id="errorMsg" class="error-message">密码错误，请重试</div>
         </div>
     </div>
-
-    <!-- 认证状态提示 -->
-    <div id="authStatus" class="auth-status">
-        <span>已认证用户</span>
-        <button id="logoutBtn" class="logout-btn">退出</button>
-    </div>
-
-    <div class="container">
+    
+    <!-- 主界面 -->
+    <div id="mainContainer" class="main-container">
+        <button id="logoutBtn" class="logout-btn">退出登录</button>
+        
         <div class="header">
             <h1>📁 文件上传与管理系统</h1>
-            <p>安全、快速的文件上传与分享平台</p>
+            <p>支持 ZIP, RAR, 7Z, TAR, GZ 格式，最大 1GB</p>
         </div>
-
-        <div class="main-content">
-            <!-- 上传区域 -->
-            <div class="upload-section">
-                <div id="uploadBox" class="upload-box">
-                    <div class="upload-icon">📤</div>
-                    <h3>拖放文件到此处上传</h3>
-                    <p>支持 ZIP, RAR, 7Z, TAR, GZ 格式，最大 1GB</p>
-                    <button id="selectFileBtn" class="upload-btn">
-                        <span>📁</span> 选择文件
-                    </button>
-                    <input type="file" id="fileInput" class="file-input" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
-                </div>
+        
+        <div class="upload-section">
+            <div id="uploadBox" class="upload-box">
+                <h3>拖放文件到此处或点击选择文件</h3>
+                <p>支持压缩文件格式，最大1GB</p>
+                <button id="selectFileBtn" class="upload-btn">选择文件</button>
+                <input type="file" id="fileInput" style="display: none;" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
             </div>
-
-            <!-- 文件列表区域 -->
-            <div class="files-section">
-                <div class="stats-bar">
-                    <div class="stats">
-                        <div class="stat-item">
-                            <span id="totalFiles" class="stat-value file-count">0</span>
-                            <span class="stat-label">文件数量</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="totalSize" class="stat-value total-size">0</span>
-                            <span class="stat-label">总大小</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="successCount" class="stat-value success-count">0</span>
-                            <span class="stat-label">成功</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="failedCount" class="stat-value failed-count">0</span>
-                            <span class="stat-label">失败</span>
-                        </div>
-                    </div>
-                    <button id="batchCopyBtn" class="batch-btn" disabled>📋 批量复制链接</button>
-                </div>
-
-                <div id="fileList" class="file-list">
-                    <div class="empty-message">
-                        <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
-                        <h3>暂无文件</h3>
-                        <p>上传文件后，它们会显示在这里</p>
-                    </div>
+        </div>
+        
+        <div class="files-section">
+            <h2>📋 文件列表</h2>
+            <div id="fileList" class="file-list">
+                <div class="empty-message">
+                    <p>暂无文件</p>
+                    <p>上传文件后，它们会显示在这里</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== DOM 元素 ====================
-        const passwordModal = document.getElementById('passwordModal');
-        const passwordInput = document.getElementById('passwordInput');
-        const passwordSubmit = document.getElementById('passwordSubmit');
-        const passwordError = document.getElementById('passwordError');
-        const authStatus = document.getElementById('authStatus');
+        // DOM元素
+        const loginModal = document.getElementById('loginModal');
+        const mainContainer = document.getElementById('mainContainer');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorMsg = document.getElementById('errorMsg');
         const logoutBtn = document.getElementById('logoutBtn');
         const uploadBox = document.getElementById('uploadBox');
         const selectFileBtn = document.getElementById('selectFileBtn');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
-        const batchCopyBtn = document.getElementById('batchCopyBtn');
-        
-        // 统计元素
-        const totalFilesEl = document.getElementById('totalFiles');
-        const totalSizeEl = document.getElementById('totalSize');
-        const successCountEl = document.getElementById('successCount');
-        const failedCountEl = document.getElementById('failedCount');
         
         // 状态变量
         let isAuthenticated = false;
-        let uploadQueue = [];
-        let activeUploads = new Map();
-        let failedUploads = [];
-        let currentFiles = [];
         
-        // ==================== 工具函数 ====================
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-        
-        function getFileExtension(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if (filename.toLowerCase().endsWith('.tar.gz')) return '.tar.gz';
-            return '.' + ext;
-        }
-        
-        // ==================== 认证相关 ====================
+        // 检查登录状态
         async function checkAuth() {
             try {
                 const response = await fetch('/check_auth');
-                if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
                 return data.authenticated || false;
             } catch (error) {
@@ -944,20 +657,26 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             }
         }
         
+        // 登录
         async function login(password) {
             try {
                 const response = await fetch('/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password: password })
                 });
-                return await response.json();
+                
+                const data = await response.json();
+                return data;
             } catch (error) {
                 console.error('登录失败:', error);
                 return { success: false, message: '网络错误' };
             }
         }
         
+        // 登出
         async function logout() {
             try {
                 await fetch('/logout', { method: 'POST' });
@@ -968,315 +687,96 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             }
         }
         
+        // 更新UI状态
         async function updateAuthStatus() {
             isAuthenticated = await checkAuth();
             
             if (isAuthenticated) {
-                passwordModal.style.display = 'none';
-                authStatus.style.display = 'block';
-                uploadBox.style.pointerEvents = 'auto';
-                uploadBox.style.opacity = '1';
-                selectFileBtn.disabled = false;
-                await loadFiles();
+                loginModal.style.display = 'none';
+                mainContainer.style.display = 'block';
+                loadFiles();
             } else {
-                passwordModal.style.display = 'flex';
-                authStatus.style.display = 'none';
-                uploadBox.style.pointerEvents = 'none';
-                uploadBox.style.opacity = '0.5';
-                selectFileBtn.disabled = true;
-                showEmptyState('请先通过密码验证');
-                updateStats(0, 0, 0, 0);
+                loginModal.style.display = 'flex';
+                mainContainer.style.display = 'none';
+                showEmptyState('请先登录');
             }
         }
         
-        // ==================== 文件管理 ====================
+        // 加载文件列表
         async function loadFiles() {
             try {
                 const response = await fetch('/files');
                 if (response.status === 401) {
+                    // 未授权，重新检查登录状态
                     await updateAuthStatus();
                     return;
                 }
                 
-                if (!response.ok) throw new Error('获取文件列表失败');
-                
                 const data = await response.json();
-                if (!data.success) throw new Error(data.message);
-                
-                currentFiles = data.files || [];
-                displayFiles(currentFiles);
-                
+                if (data.success) {
+                    displayFiles(data.files);
+                } else {
+                    showEmptyState('加载文件列表失败');
+                }
             } catch (error) {
                 console.error('加载文件失败:', error);
-                showEmptyState('加载文件列表失败');
+                showEmptyState('网络错误');
             }
         }
         
+        // 显示文件列表
         function displayFiles(files) {
             if (!files || files.length === 0) {
                 showEmptyState('暂无文件');
-                updateStats(0, 0, 0, failedUploads.length);
                 return;
             }
             
-            let totalSize = 0;
             let html = '';
-            
             files.forEach(file => {
-                totalSize += file.size || 0;
-                // 使用原始文件名显示，但下载链接使用UUID
-                const displayName = file.original_name || file.name || file.filename;
-                const fileSize = formatFileSize(file.size || 0);
-                const fileId = file.uuid || file.filename; // UUID文件名
-                const downloadUrl = `/download/${fileId}`; // 使用UUID构建下载链接
-                const fileExt = getFileExtension(displayName).toLowerCase();
-                
-                // 根据文件类型设置图标
-                let fileIcon = '📄';
-                if (fileExt === '.zip') fileIcon = '🗜️';
-                else if (fileExt === '.rar') fileIcon = '🗃️';
-                else if (fileExt === '.7z') fileIcon = '🗄️';
-                else if (fileExt === '.tar' || fileExt === '.tar.gz') fileIcon = '📦';
-                else if (fileExt === '.gz') fileIcon = '💨';
+                const fileSize = formatFileSize(file.size);
+                const fileName = file.original_name || file.name;
                 
                 html += `
-                    <div class="file-item" data-id="${fileId}">
+                    <div class="file-item">
                         <div class="file-info">
-                            <div class="file-icon">${fileIcon}</div>
-                            <div class="file-details">
-                                <div class="file-name" title="${displayName}">${displayName}</div>
-                                <div class="file-size">${fileSize}</div>
-                                <div style="font-size: 11px; color: #999; margin-top: 3px;">
-                                    文件ID: ${fileId.substring(0, 8)}...
-                                </div>
-                            </div>
+                            <div class="file-name">${fileName}</div>
+                            <div class="file-size">${fileSize}</div>
                         </div>
-                        <div class="file-actions">
-                            <button class="copy-btn" onclick="copyLink('${fileId}', '${displayName}')">复制链接</button>
-                        </div>
+                        <button class="copy-btn" onclick="copyLink('${file.uuid || file.filename}', '${fileName}')">
+                            复制链接
+                        </button>
                     </div>
                 `;
             });
             
             fileList.innerHTML = html;
-            updateStats(files.length, totalSize, files.length, failedUploads.length);
         }
         
-        function showEmptyState(message = '暂无文件') {
+        // 显示空状态
+        function showEmptyState(message) {
             fileList.innerHTML = `
                 <div class="empty-message">
-                    <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
-                    <h3>${message}</h3>
-                    <p>${message.includes('验证') ? '请先输入密码验证身份' : '上传文件后，它们会显示在这里'}</p>
+                    <p>${message}</p>
                 </div>
             `;
         }
         
-        function updateStats(total, size, success, failed) {
-            totalFilesEl.textContent = total;
-            totalSizeEl.textContent = formatFileSize(size);
-            successCountEl.textContent = success;
-            failedCountEl.textContent = failed;
-            batchCopyBtn.disabled = total === 0;
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        // ==================== 文件上传 ====================
-        async function uploadFile(file) {
-            // 验证文件类型
-            const allowedExts = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'];
-            const fileExt = getFileExtension(file.name);
-            
-            if (!allowedExts.includes(fileExt)) {
-                alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件 (ZIP, RAR, 7Z, TAR, GZ)`);
-                failedUploads.push({ name: file.name, error: '不支持的文件格式' });
-                updateStats(currentFiles.length, 
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
-                return;
-            }
-            
-            // 验证文件大小 (1GB)
-            if (file.size > 1024 * 1024 * 1024) {
-                alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
-                failedUploads.push({ name: file.name, error: '文件超过大小限制' });
-                updateStats(currentFiles.length,
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
-                return;
-            }
-            
-            // 创建上传项目
-            const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const uploadItem = createUploadItem(file, uploadId);
-            
-            // 准备表单数据
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            // 创建 XMLHttpRequest
-            const xhr = new XMLHttpRequest();
-            
-            // 进度事件
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    updateUploadProgress(uploadId, percent);
-                }
-            });
-            
-            // 完成事件
-            xhr.addEventListener('load', () => {
-                handleUploadComplete(uploadId, xhr, file);
-            });
-            
-            // 错误事件
-            xhr.addEventListener('error', () => {
-                handleUploadError(uploadId, file, '网络错误');
-            });
-            
-            // 存储上传
-            activeUploads.set(uploadId, { xhr, file, item: uploadItem });
-            
-            // 发送请求
-            xhr.open('POST', '/upload');
-            xhr.send(formData);
-        }
-        
-        function createUploadItem(file, uploadId) {
-            // 移除空状态
-            if (fileList.querySelector('.empty-message')) {
-                fileList.innerHTML = '';
-            }
-            
-            const item = document.createElement('div');
-            item.className = 'file-item';
-            item.id = uploadId;
-            item.innerHTML = `
-                <div class="file-info">
-                    <div class="file-icon">⏳</div>
-                    <div class="file-details">
-                        <div class="file-name" title="${file.name}">${file.name}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="copy-btn" style="background: #ff4757;" onclick="cancelUpload('${uploadId}')">
-                        取消
-                    </button>
-                </div>
-            `;
-            
-            // 显示进度条
-            item.querySelector('.progress-container').style.display = 'block';
-            
-            // 添加到列表顶部
-            fileList.prepend(item);
-            return item;
-        }
-        
-        function updateUploadProgress(uploadId, percent) {
-            const item = document.getElementById(uploadId);
-            if (item) {
-                const progressBar = item.querySelector('.progress-bar');
-                if (progressBar) {
-                    progressBar.style.width = percent + '%';
-                }
-            }
-        }
-        
-        function handleUploadComplete(uploadId, xhr, file) {
-            const upload = activeUploads.get(uploadId);
-            if (!upload) return;
-            
-            try {
-                const response = JSON.parse(xhr.responseText);
-                
-                if (xhr.status === 200 && response.success) {
-                    // 上传成功
-                    upload.item.querySelector('.file-icon').textContent = '✅';
-                    upload.item.querySelector('.progress-bar').style.background = '#00b894';
-                    
-                    // 显示成功信息
-                    const uuidFilename = response.uuid_filename || '未知UUID';
-                    upload.item.querySelector('.file-name').innerHTML = 
-                        `${file.name} <small style="color: #00b894;">(上传成功)</small>`;
-                    
-                    setTimeout(() => {
-                        if (upload.item.parentNode) {
-                            upload.item.remove();
-                        }
-                        loadFiles(); // 重新加载文件列表
-                    }, 1000);
-                    
-                } else if (xhr.status === 401) {
-                    // 未授权
-                    handleUploadError(uploadId, file, '会话过期，请重新登录');
-                    updateAuthStatus();
-                } else {
-                    // 其他错误
-                    const errorMsg = response.message || '上传失败';
-                    handleUploadError(uploadId, file, errorMsg);
-                }
-            } catch (error) {
-                handleUploadError(uploadId, file, '服务器响应错误');
-            }
-            
-            activeUploads.delete(uploadId);
-        }
-        
-        function handleUploadError(uploadId, file, error) {
-            const upload = activeUploads.get(uploadId);
-            if (!upload) return;
-            
-            upload.item.querySelector('.file-icon').textContent = '❌';
-            upload.item.querySelector('.file-name').innerHTML = `${file.name} <small style="color: #ff4757;">(${error})</small>`;
-            upload.item.querySelector('.progress-bar').style.background = '#ff4757';
-            upload.item.querySelector('.copy-btn').style.display = 'none';
-            
-            failedUploads.push({ name: file.name, error });
-            
-            setTimeout(() => {
-                if (upload.item.parentNode) {
-                    upload.item.remove();
-                }
-                updateStats(currentFiles.length,
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
-            }, 3000);
-            
-            activeUploads.delete(uploadId);
-        }
-        
-        // ==================== 全局函数 ====================
-        window.cancelUpload = function(uploadId) {
-            const upload = activeUploads.get(uploadId);
-            if (upload && upload.xhr) {
-                upload.xhr.abort();
-                upload.item.querySelector('.file-icon').textContent = '⏹️';
-                upload.item.querySelector('.file-name').innerHTML = `${upload.file.name} <small style="color: #999;">(已取消)</small>`;
-                
-                setTimeout(() => {
-                    if (upload.item.parentNode) {
-                        upload.item.remove();
-                    }
-                }, 1000);
-                
-                activeUploads.delete(uploadId);
-            }
-        };
-        
-        window.copyLink = async function(fileId, displayName) {
+        // 复制链接
+        async function copyLink(fileId, fileName) {
             const fileUrl = `${window.location.origin}/download/${fileId}`;
             
             try {
                 await navigator.clipboard.writeText(fileUrl);
-                alert(`✅ 链接已复制到剪贴板\n\n文件名: ${displayName}\n链接: ${fileUrl}`);
+                alert(`✅ 链接已复制到剪贴板\n\n文件名: ${fileName}\n链接: ${fileUrl}`);
             } catch (err) {
                 // 备用方法
                 const textarea = document.createElement('textarea');
@@ -1285,21 +785,108 @@ cat > $PROJECT_ROOT/index.html << HTML_END
                 textarea.select();
                 try {
                     document.execCommand('copy');
-                    alert(`✅ 链接已复制到剪贴板\n\n文件名: ${displayName}\n链接: ${fileUrl}`);
+                    alert(`✅ 链接已复制到剪贴板\n\n文件名: ${fileName}\n链接: ${fileUrl}`);
                 } catch (err2) {
-                    alert('❌ 复制失败，请手动复制链接:\n' + fileUrl);
+                    prompt('请手动复制链接:', fileUrl);
                 }
                 document.body.removeChild(textarea);
             }
-        };
+        }
         
-        // ==================== 事件监听 ====================
-        // 密码验证
-        passwordSubmit.addEventListener('click', async () => {
+        // 上传文件
+        function uploadFile(file) {
+            // 验证文件类型
+            const allowedExts = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            const isTarGz = file.name.toLowerCase().endsWith('.tar.gz');
+            
+            if (!allowedExts.includes(fileExt) && !isTarGz) {
+                alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件`);
+                return;
+            }
+            
+            // 验证文件大小
+            if (file.size > 1024 * 1024 * 1024) {
+                alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // 创建文件项
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${formatFileSize(file.size)}</div>
+                    <div class="progress-bar">
+                        <div class="progress"></div>
+                    </div>
+                </div>
+                <div>上传中...</div>
+            `;
+            
+            const progressBar = fileItem.querySelector('.progress-bar');
+            const progress = fileItem.querySelector('.progress');
+            progressBar.style.display = 'block';
+            
+            // 从空状态移除
+            if (fileList.querySelector('.empty-message')) {
+                fileList.innerHTML = '';
+            }
+            
+            fileList.prepend(fileItem);
+            
+            // 发送请求
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    progress.style.width = '100%';
+                    fileItem.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${data.original_name}</div>
+                            <div class="file-size">${formatFileSize(data.size)}</div>
+                        </div>
+                        <div style="color: #4CAF50;">✅ 上传成功</div>
+                    `;
+                    
+                    setTimeout(() => {
+                        loadFiles(); // 重新加载文件列表
+                    }, 1000);
+                } else {
+                    fileItem.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
+                        </div>
+                        <div style="color: #f44336;">❌ ${data.message || '上传失败'}</div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('上传错误:', error);
+                fileItem.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <div style="color: #f44336;">❌ 上传失败</div>
+                `;
+            });
+        }
+        
+        // 事件监听器
+        loginBtn.addEventListener('click', async () => {
             const password = passwordInput.value.trim();
             if (!password) {
-                passwordError.textContent = '请输入密码';
-                passwordError.style.display = 'block';
+                errorMsg.textContent = '请输入密码';
+                errorMsg.style.display = 'block';
                 return;
             }
             
@@ -1307,11 +894,9 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             
             if (result.success) {
                 await updateAuthStatus();
-                passwordError.style.display = 'none';
-                passwordInput.value = '';
             } else {
-                passwordError.textContent = result.message || '密码错误';
-                passwordError.style.display = 'block';
+                errorMsg.textContent = result.message || '密码错误';
+                errorMsg.style.display = 'block';
                 passwordInput.value = '';
                 passwordInput.focus();
             }
@@ -1319,31 +904,20 @@ cat > $PROJECT_ROOT/index.html << HTML_END
         
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                passwordSubmit.click();
+                loginBtn.click();
             }
         });
         
-        // 退出登录
         logoutBtn.addEventListener('click', async () => {
             await logout();
             await updateAuthStatus();
         });
         
-        // 选择文件
         selectFileBtn.addEventListener('click', () => {
-            if (!isAuthenticated) {
-                alert('请先通过密码验证');
-                return;
-            }
             fileInput.click();
         });
         
         fileInput.addEventListener('change', (e) => {
-            if (!isAuthenticated) {
-                alert('请先通过密码验证');
-                return;
-            }
-            
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             
@@ -1351,31 +925,24 @@ cat > $PROJECT_ROOT/index.html << HTML_END
                 uploadFile(file);
             });
             
-            fileInput.value = ''; // 清除选择，允许选择相同文件
+            fileInput.value = '';
         });
         
-        // 拖放上传
         uploadBox.addEventListener('dragover', (e) => {
-            if (!isAuthenticated) {
-                e.preventDefault();
-                return;
-            }
             e.preventDefault();
-            uploadBox.classList.add('dragover');
+            uploadBox.style.borderColor = '#4CAF50';
+            uploadBox.style.background = '#f0f8f0';
         });
         
         uploadBox.addEventListener('dragleave', () => {
-            uploadBox.classList.remove('dragover');
+            uploadBox.style.borderColor = '#ddd';
+            uploadBox.style.background = 'white';
         });
         
         uploadBox.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadBox.classList.remove('dragover');
-            
-            if (!isAuthenticated) {
-                alert('请先通过密码验证');
-                return;
-            }
+            uploadBox.style.borderColor = '#ddd';
+            uploadBox.style.background = 'white';
             
             const files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
@@ -1385,65 +952,17 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             });
         });
         
-        // 批量复制
-        batchCopyBtn.addEventListener('click', async () => {
-            try {
-                const response = await fetch('/files');
-                if (!response.ok) throw new Error('获取文件列表失败');
-                
-                const data = await response.json();
-                if (!data.success) throw new Error(data.message);
-                
-                const files = data.files || [];
-                if (files.length === 0) {
-                    alert('没有文件可以复制');
-                    return;
-                }
-                
-                const serverUrl = window.location.origin;
-                let allLinks = '';
-                
-                files.forEach((file, index) => {
-                    const displayName = file.original_name || file.name || file.filename;
-                    const fileId = file.uuid || file.filename;
-                    const fileUrl = `${serverUrl}/download/${fileId}`;
-                    allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
-                });
-                
-                try {
-                    await navigator.clipboard.writeText(allLinks);
-                    alert(`✅ 已复制 ${files.length} 个文件的链接到剪贴板！`);
-                } catch (err) {
-                    // 备用方法
-                    const textarea = document.createElement('textarea');
-                    textarea.value = allLinks;
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    alert(`✅ 已复制 ${files.length} 个文件的链接到剪贴板！`);
-                }
-                
-            } catch (error) {
-                console.error('批量复制失败:', error);
-                alert('批量复制失败: ' + error.message);
-            }
-        });
-        
-        // ==================== 初始化 ====================
-        async function init() {
+        // 页面加载时检查登录状态
+        window.addEventListener('load', async () => {
             await updateAuthStatus();
             
-            // 每30秒刷新文件列表
-            setInterval(async () => {
+            // 自动刷新文件列表
+            setInterval(() => {
                 if (isAuthenticated) {
-                    await loadFiles();
+                    loadFiles();
                 }
             }, 30000);
-        }
-        
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', init);
+        });
     </script>
 </body>
 </html>
@@ -1454,7 +973,9 @@ echo "8. 创建启动脚本..."
 cat > $PROJECT_ROOT/start.sh << START_EOF
 #!/bin/bash
 cd $PROJECT_ROOT
-python3 server.py
+nohup python3 server.py > server.log 2>&1 &
+echo "服务已启动，日志: $PROJECT_ROOT/server.log"
+echo "使用 ./status.sh 查看状态"
 START_EOF
 
 chmod +x $PROJECT_ROOT/start.sh
@@ -1483,8 +1004,18 @@ RESTART_EOF
 
 chmod +x $PROJECT_ROOT/restart.sh
 
+# 创建查看日志脚本
+echo "11. 创建查看日志脚本..."
+cat > $PROJECT_ROOT/logs.sh << LOGS_EOF
+#!/bin/bash
+cd $PROJECT_ROOT
+tail -f server.log
+LOGS_EOF
+
+chmod +x $PROJECT_ROOT/logs.sh
+
 # 创建修改密码脚本
-echo "11. 创建密码修改脚本..."
+echo "12. 创建密码修改脚本..."
 cat > $PROJECT_ROOT/change-password.sh << CHANGE_PASS_EOF
 #!/bin/bash
 
@@ -1502,15 +1033,18 @@ echo ""
 read -sp "请再次确认新密码: " NEW_PASSWORD_CONFIRM
 echo ""
 
-if [ "$NEW_PASSWORD" != "$NEW_PASSWORD_CONFIRM" ]; then
+if [ "\$NEW_PASSWORD" != "\$NEW_PASSWORD_CONFIRM" ]; then
     echo "错误：两次输入的密码不一致！"
     exit 1
 fi
 
-if [ -z "$NEW_PASSWORD" ]; then
+if [ -z "\$NEW_PASSWORD" ]; then
     echo "错误：密码不能为空！"
     exit 1
 fi
+
+# 停止服务
+./stop.sh
 
 # 更新配置文件
 OLD_PORT=$(grep "DEFAULT_PORT = " config.py | cut -d'=' -f2 | tr -d ' ')
@@ -1520,7 +1054,7 @@ import hashlib
 import socket
 
 # 密码设置（安装时设置）
-ADMIN_PASSWORD = "$NEW_PASSWORD"
+ADMIN_PASSWORD = "\$NEW_PASSWORD"
 
 # 端口设置（保持原端口）
 DEFAULT_PORT = $OLD_PORT
@@ -1550,119 +1084,101 @@ def find_available_port(start_port):
     return None
 CONFIG_UPDATE_END
 
+# 启动服务
+./start.sh
+
 echo "✅ 密码修改成功！"
-echo "需要重启服务才能使新密码生效。"
-echo ""
-echo "重启命令:"
-echo "cd $PROJECT_ROOT && ./restart.sh"
+echo "服务已重启，新密码立即生效。"
 CHANGE_PASS_EOF
 
 chmod +x $PROJECT_ROOT/change-password.sh
 
 # 创建查看状态脚本
-echo "12. 创建查看状态脚本..."
+echo "13. 创建查看状态脚本..."
 cat > $PROJECT_ROOT/status.sh << STATUS_EOF
 #!/bin/bash
 echo "=== 文件上传系统状态 (UUID版本) ==="
 echo ""
+
+cd $PROJECT_ROOT
 
 # 检查进程是否运行
 if pgrep -f "python3 server.py" > /dev/null; then
     echo "✅ 服务状态: 运行中"
     
     # 获取端口信息
-    PORT=$(netstat -tlnp 2>/dev/null | grep "python3" | grep "server.py" | awk '{print $4}' | cut -d':' -f2 | head -1)
+    PORT=$(netstat -tlnp 2>/dev/null | grep "python3" | grep "server.py" | awk '{print \$4}' | cut -d':' -f2 | head -1)
     
-    if [ -n "$PORT" ]; then
-        echo "📡 运行端口: $PORT"
+    if [ -n "\$PORT" ]; then
+        echo "📡 运行端口: \$PORT"
     else
-        PORT_INFO=$(ps aux | grep "python3 server.py" | grep -v grep | tr -s ' ' | cut -d' ' -f22 | grep -o "[0-9]*$")
-        if [ -n "$PORT_INFO" ]; then
-            echo "📡 运行端口: $PORT_INFO"
-            PORT=$PORT_INFO
+        PORT_INFO=\$(ps aux | grep "python3 server.py" | grep -v grep | tr -s ' ' | cut -d' ' -f22 | grep -o "[0-9]*\$")
+        if [ -n "\$PORT_INFO" ]; then
+            echo "📡 运行端口: \$PORT_INFO"
+            PORT=\$PORT_INFO
         else
-            echo "📡 运行端口: 获取中..."
+            echo "📡 运行端口: 从日志中获取..."
+            PORT=\$(grep "访问地址:" server.log | tail -1 | grep -o ":[0-9]*" | tr -d ':')
+            if [ -n "\$PORT" ]; then
+                echo "📡 运行端口: \$PORT"
+            else
+                echo "📡 运行端口: 未知"
+            fi
         fi
     fi
     
     # 获取IP地址
-    IP_ADDRESS=$(hostname -I | awk '{print $1}')
-    if [ -n "$PORT" ]; then
-        echo "🌐 访问地址: http://$IP_ADDRESS:$PORT"
+    IP_ADDRESS=\$(hostname -I | awk '{print \$1}')
+    if [ -n "\$PORT" ]; then
+        echo "🌐 访问地址: http://\$IP_ADDRESS:\$PORT"
     else
-        echo "🌐 访问地址: 请查看启动日志"
+        echo "🌐 访问地址: 请查看日志文件"
     fi
     
     # 统计上传文件
-    if [ -d "$PROJECT_ROOT/uploads" ]; then
-        FILE_COUNT=$(ls $PROJECT_ROOT/uploads/ 2>/dev/null | wc -l)
-        echo "📁 文件数量: $FILE_COUNT"
+    if [ -d "\$PROJECT_ROOT/uploads" ]; then
+        FILE_COUNT=\$(ls \$PROJECT_ROOT/uploads/ 2>/dev/null | wc -l)
+        echo "📁 文件数量: \$FILE_COUNT"
         
-        TOTAL_SIZE=$(du -sh $PROJECT_ROOT/uploads 2>/dev/null | cut -f1)
-        echo "💾 总大小: $TOTAL_SIZE"
+        TOTAL_SIZE=\$(du -sh \$PROJECT_ROOT/uploads 2>/dev/null | cut -f1)
+        echo "💾 总大小: \$TOTAL_SIZE"
     fi
     
-    # 检查映射文件
-    if [ -f "$PROJECT_ROOT/file_mapping.json" ]; then
-        MAPPING_COUNT=$(grep -c '"original_name"' $PROJECT_ROOT/file_mapping.json 2>/dev/null || echo "0")
-        echo "🗂️  文件映射: $MAPPING_COUNT 条记录"
-    fi
+    # 显示日志文件位置
+    echo "📝 日志文件: \$PROJECT_ROOT/server.log"
+    
+    # 显示最后几行日志
+    echo ""
+    echo "最近日志:"
+    tail -5 server.log
 else
     echo "❌ 服务状态: 未运行"
     echo ""
     echo "启动命令:"
-    echo "cd $PROJECT_ROOT && ./start.sh"
+    echo "cd \$PROJECT_ROOT && ./start.sh"
 fi
 
 echo ""
 echo "管理命令:"
-echo "- 启动: ./start.sh"
-echo "- 停止: ./stop.sh"
-echo "- 重启: ./restart.sh"
+echo "- 查看状态: ./status.sh"
+echo "- 启动服务: ./start.sh"
+echo "- 停止服务: ./stop.sh"
+echo "- 重启服务: ./restart.sh"
+echo "- 查看日志: ./logs.sh"
 echo "- 修改密码: sudo ./change-password.sh"
 STATUS_EOF
 
 chmod +x $PROJECT_ROOT/status.sh
 
-# 创建清理脚本
-echo "13. 创建清理脚本..."
-cat > $PROJECT_ROOT/cleanup.sh << CLEANUP_EOF
-#!/bin/bash
-echo "=== 清理文件上传系统 ==="
-echo "警告：此操作将删除所有上传的文件！"
-echo ""
-
-read -p "确定要清理所有文件吗？(y/N): " CONFIRM
-
-if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    echo "操作取消"
-    exit 0
-fi
-
-cd $PROJECT_ROOT
-
-# 停止服务
-./stop.sh
-
-# 删除上传的文件
-rm -rf uploads/*
-rm -f file_mapping.json
-
-# 重新创建目录
-mkdir -p uploads
-
-echo ""
-echo "✅ 所有文件已清理！"
-echo "现在可以重新启动服务:"
-echo "cd $PROJECT_ROOT && ./start.sh"
-CLEANUP_EOF
-
-chmod +x $PROJECT_ROOT/cleanup.sh
-
 # 设置目录权限
 echo "14. 设置目录权限..."
 chmod -R 755 $PROJECT_ROOT
 chmod 777 $PROJECT_ROOT/uploads
+
+# 启动服务
+echo "15. 启动文件上传服务..."
+cd $PROJECT_ROOT
+./start.sh
 
 # 获取服务器IP
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
@@ -1683,17 +1199,17 @@ echo "   - 下载时显示：原始文件名"
 echo ""
 echo "管理命令:"
 echo "- 查看状态: cd $PROJECT_ROOT && ./status.sh"
+echo "- 查看日志: cd $PROJECT_ROOT && ./logs.sh"
 echo "- 启动服务: cd $PROJECT_ROOT && ./start.sh"
 echo "- 停止服务: cd $PROJECT_ROOT && ./stop.sh"
 echo "- 重启服务: cd $PROJECT_ROOT && ./restart.sh"
 echo "- 修改密码: cd $PROJECT_ROOT && sudo ./change-password.sh"
-echo "- 清理文件: cd $PROJECT_ROOT && ./cleanup.sh"
 echo ""
 echo "安装目录: $PROJECT_ROOT"
 echo "上传目录: $PROJECT_ROOT/uploads"
-echo "映射文件: $PROJECT_ROOT/file_mapping.json"
+echo "日志文件: $PROJECT_ROOT/server.log"
 echo ""
-echo "现在可以启动服务了："
-echo "cd $PROJECT_ROOT && ./start.sh"
+echo "如果无法访问，请检查防火墙设置:"
+echo "sudo ufw allow $DEFAULT_PORT/tcp"
 echo ""
-echo "访问地址: http://$IP_ADDRESS:$DEFAULT_PORT"
+echo "✅ 安装完成！现在可以通过浏览器访问系统了。"

@@ -126,11 +126,39 @@
             color: #e74c3c;
         }
         
+        .stats-right {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .view-toggle {
+            display: flex;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+        
+        .view-toggle-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .view-toggle-btn.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+        
         .batch-copy-btn {
             background-color: #9b59b6;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 4px;
             font-size: 14px;
             cursor: pointer;
@@ -144,6 +172,14 @@
         .batch-copy-btn:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
+        }
+        
+        .batch-copy-current {
+            background-color: #27ae60;
+        }
+        
+        .batch-copy-current:hover {
+            background-color: #219653;
         }
         
         .file-list {
@@ -206,18 +242,55 @@
             margin-top: 3px;
         }
         
+        .file-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        
+        .status-uploading {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .status-success {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .status-failed {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
         .copy-btn {
             background-color: #7f8c8d;
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .copy-btn:hover {
             background-color: #6c7b7d;
+        }
+        
+        .cancel-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+        
+        .cancel-btn:hover {
+            background-color: #c0392b;
         }
         
         .empty-message {
@@ -414,6 +487,16 @@
                 gap: 15px;
             }
             
+            .stats-right {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .view-toggle {
+                margin-right: 0;
+                justify-content: center;
+            }
+            
             .file-info {
                 flex-direction: column;
                 align-items: flex-start;
@@ -487,7 +570,14 @@
                     <span class="stat-value failed-count" id="failedCount">0</span>
                 </div>
             </div>
-            <button class="batch-copy-btn" id="batchCopyBtn" disabled>批量复制所有链接</button>
+            <div class="stats-right">
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" id="currentViewBtn">当前上传</button>
+                    <button class="view-toggle-btn" id="allViewBtn">查看所有</button>
+                </div>
+                <button class="batch-copy-btn batch-copy-current" id="batchCopyCurrentBtn" disabled>批量复制当前</button>
+                <button class="batch-copy-btn" id="batchCopyAllBtn" disabled>批量复制所有</button>
+            </div>
         </div>
         
         <div class="file-list" id="fileList">
@@ -507,8 +597,11 @@
         const selectFileBtn = document.getElementById('selectFileBtn');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
-        const batchCopyBtn = document.getElementById('batchCopyBtn');
+        const batchCopyCurrentBtn = document.getElementById('batchCopyCurrentBtn');
+        const batchCopyAllBtn = document.getElementById('batchCopyAllBtn');
         const lockIcon = document.getElementById('lockIcon');
+        const currentViewBtn = document.getElementById('currentViewBtn');
+        const allViewBtn = document.getElementById('allViewBtn');
         
         // 统计元素
         const totalFilesEl = document.getElementById('totalFiles');
@@ -518,10 +611,11 @@
         
         // 状态变量
         let isAuthenticated = false;
-        let uploadQueue = [];
         let activeUploads = new Map();
         let failedUploads = [];
-        let currentFiles = [];
+        let currentFiles = []; // 从服务器获取的所有文件
+        let currentSessionFiles = []; // 当前会话上传的文件
+        let currentViewMode = 'current'; // 'current' 或 'all'
         
         // ==================== 工具函数 ====================
         function formatFileSize(bytes) {
@@ -615,7 +709,7 @@
                 if (!data.success) throw new Error(data.message);
                 
                 currentFiles = data.files || [];
-                displayFiles(currentFiles);
+                updateDisplay();
                 
             } catch (error) {
                 console.error('加载文件失败:', error);
@@ -623,52 +717,170 @@
             }
         }
         
+        function updateDisplay() {
+            const filesToDisplay = currentViewMode === 'current' ? currentSessionFiles : currentFiles;
+            displayFiles(filesToDisplay);
+        }
+        
         function displayFiles(files) {
             if (!files || files.length === 0) {
-                showEmptyState('暂无文件');
-                updateStats(0, 0, 0, failedUploads.length);
+                showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
+                updateStats(0, 0, 0, 0);
                 return;
             }
             
             let totalSize = 0;
+            let successCount = 0;
             let html = '';
             
-            files.forEach(file => {
-                totalSize += file.size || 0;
-                const displayName = file.original_name || file.name || file.filename;
-                const fileSize = formatFileSize(file.size || 0);
-                const fileId = file.uuid || file.filename;
-                const fileExt = getFileExtension(displayName).toLowerCase();
+            // 显示当前上传的文件（包括上传中和已上传的）
+            if (currentViewMode === 'current') {
+                // 显示上传中的文件
+                activeUploads.forEach((upload, uploadId) => {
+                    const file = upload.file;
+                    totalSize += file.size || 0;
+                    
+                    html += createFileItemHtml(
+                        uploadId,
+                        file.name,
+                        file.size,
+                        'uploading',
+                        upload.progress || 0
+                    );
+                });
                 
-                // 根据文件类型设置图标
-                let fileIcon = '📄';
-                if (fileExt === '.zip') fileIcon = '🗜️';
-                else if (fileExt === '.rar') fileIcon = '🗃️';
-                else if (fileExt === '.7z') fileIcon = '🗄️';
-                else if (fileExt === '.tar' || fileExt === '.tar.gz') fileIcon = '📦';
-                else if (fileExt === '.gz') fileIcon = '💨';
+                // 显示当前会话已上传的文件
+                files.forEach(file => {
+                    if (!activeUploads.has(file.id)) {
+                        totalSize += file.size || 0;
+                        successCount++;
+                        
+                        const displayName = file.original_name || file.name || file.filename;
+                        const fileId = file.uuid || file.filename;
+                        
+                        html += createFileItemHtml(
+                            fileId,
+                            displayName,
+                            file.size,
+                            'success'
+                        );
+                    }
+                });
                 
-                html += `
-                    <div class="file-item" data-id="${fileId}">
-                        <div class="file-info">
-                            <div class="file-icon">${fileIcon}</div>
-                            <div class="file-details">
-                                <div class="file-name" title="${displayName}">${displayName}</div>
-                                <div class="file-size">${fileSize}</div>
-                                <div class="file-uuid">
-                                    文件ID: ${fileId.substring(0, 8)}...
-                                </div>
-                            </div>
-                        </div>
-                        <div class="file-actions">
-                            <button class="copy-btn" onclick="copyLink('${fileId}', '${displayName}')">复制链接</button>
-                        </div>
-                    </div>
-                `;
-            });
+                // 显示失败的文件
+                failedUploads.forEach((file, index) => {
+                    totalSize += file.size || 0;
+                    
+                    html += createFileItemHtml(
+                        'failed-' + index,
+                        file.name,
+                        file.size,
+                        'failed'
+                    );
+                });
+            } else {
+                // 显示所有文件
+                files.forEach(file => {
+                    totalSize += file.size || 0;
+                    successCount++;
+                    
+                    const displayName = file.original_name || file.name || file.filename;
+                    const fileId = file.uuid || file.filename;
+                    
+                    html += createFileItemHtml(
+                        fileId,
+                        displayName,
+                        file.size,
+                        'success'
+                    );
+                });
+            }
             
             fileList.innerHTML = html;
-            updateStats(files.length, totalSize, files.length, failedUploads.length);
+            
+            // 更新统计信息
+            const totalCount = currentViewMode === 'current' 
+                ? activeUploads.size + files.length + failedUploads.length
+                : files.length;
+            
+            const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
+            
+            updateStats(totalCount, totalSize, successCount, failedCount);
+            
+            // 更新批量复制按钮状态
+            const hasFiles = currentViewMode === 'current' 
+                ? (activeUploads.size + files.length + failedUploads.length) > 0
+                : files.length > 0;
+                
+            const hasAllFiles = currentFiles.length > 0;
+            
+            batchCopyCurrentBtn.disabled = !hasFiles;
+            batchCopyAllBtn.disabled = !hasAllFiles;
+        }
+        
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
+            const fileExt = getFileExtension(fileName).toLowerCase();
+            const fileSizeFormatted = formatFileSize(fileSize || 0);
+            
+            // 根据文件类型设置图标
+            let fileIcon = '📄';
+            if (fileExt === '.zip') fileIcon = '🗜️';
+            else if (fileExt === '.rar') fileIcon = '🗃️';
+            else if (fileExt === '.7z') fileIcon = '🗄️';
+            else if (fileExt === '.tar' || fileExt === '.tar.gz') fileIcon = '📦';
+            else if (fileExt === '.gz') fileIcon = '💨';
+            
+            // 状态文本
+            let statusText = '';
+            let statusClass = '';
+            let actionButtons = '';
+            
+            if (status === 'uploading') {
+                statusText = '上传中';
+                statusClass = 'status-uploading';
+                actionButtons = `
+                    <button class="cancel-btn" onclick="cancelUpload('${fileId}')">取消</button>
+                `;
+            } else if (status === 'success') {
+                statusText = '已上传';
+                statusClass = 'status-success';
+                actionButtons = `
+                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName}')">复制链接</button>
+                `;
+            } else if (status === 'failed') {
+                statusText = '上传失败';
+                statusClass = 'status-failed';
+                actionButtons = '';
+            }
+            
+            // 进度条
+            const progressBar = status === 'uploading' ? `
+                <div class="progress-container" style="display: block;">
+                    <div class="progress-bar" style="width: ${progress}%"></div>
+                </div>
+            ` : '';
+            
+            return `
+                <div class="file-item" data-id="${fileId}">
+                    <div class="file-info">
+                        <div class="file-icon">${fileIcon}</div>
+                        <div class="file-details">
+                            <div class="file-name" title="${fileName}">
+                                ${fileName}
+                                <span class="file-status ${statusClass}">${statusText}</span>
+                            </div>
+                            <div class="file-size">${fileSizeFormatted}</div>
+                            <div class="file-uuid">
+                                文件ID: ${fileId.substring(0, 8)}...
+                            </div>
+                            ${progressBar}
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
         }
         
         function showEmptyState(message = '暂无文件') {
@@ -686,7 +898,6 @@
             totalSizeEl.textContent = formatFileSize(size);
             successCountEl.textContent = success;
             failedCountEl.textContent = failed;
-            batchCopyBtn.disabled = total === 0;
         }
         
         // ==================== 文件上传 ====================
@@ -697,28 +908,31 @@
             
             if (!allowedExts.includes(fileExt)) {
                 alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件 (ZIP, RAR, 7Z, TAR, GZ)`);
-                failedUploads.push({ name: file.name, error: '不支持的文件格式' });
-                updateStats(currentFiles.length, 
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
+                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size });
+                updateDisplay();
                 return;
             }
             
             // 验证文件大小 (1GB)
             if (file.size > 1024 * 1024 * 1024) {
                 alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
-                failedUploads.push({ name: file.name, error: '文件超过大小限制' });
-                updateStats(currentFiles.length,
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
+                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size });
+                updateDisplay();
                 return;
             }
             
             // 创建上传项目
             const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const uploadItem = createUploadItem(file, uploadId);
+            
+            // 存储上传信息
+            activeUploads.set(uploadId, { 
+                file: file, 
+                progress: 0,
+                id: uploadId
+            });
+            
+            // 更新显示
+            updateDisplay();
             
             // 准备表单数据
             const formData = new FormData();
@@ -731,7 +945,11 @@
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const percent = Math.round((e.loaded / e.total) * 100);
-                    updateUploadProgress(uploadId, percent);
+                    const upload = activeUploads.get(uploadId);
+                    if (upload) {
+                        upload.progress = percent;
+                        updateDisplay();
+                    }
                 }
             });
             
@@ -745,58 +963,13 @@
                 handleUploadError(uploadId, file, '网络错误');
             });
             
-            // 存储上传
-            activeUploads.set(uploadId, { xhr, file, item: uploadItem });
+            // 存储xhr引用
+            const upload = activeUploads.get(uploadId);
+            upload.xhr = xhr;
             
             // 发送请求
             xhr.open('POST', '/upload');
             xhr.send(formData);
-        }
-        
-        function createUploadItem(file, uploadId) {
-            // 移除空状态
-            const noFilesMessage = document.getElementById('noFilesMessage');
-            if (noFilesMessage && noFilesMessage.parentNode) {
-                noFilesMessage.remove();
-            }
-            
-            const item = document.createElement('div');
-            item.className = 'file-item';
-            item.id = uploadId;
-            item.innerHTML = `
-                <div class="file-info">
-                    <div class="file-icon">⏳</div>
-                    <div class="file-details">
-                        <div class="file-name" title="${file.name}">${file.name}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="copy-btn" style="background-color: #e74c3c;" onclick="cancelUpload('${uploadId}')">
-                        取消
-                    </button>
-                </div>
-            `;
-            
-            // 显示进度条
-            item.querySelector('.progress-container').style.display = 'block';
-            
-            // 添加到列表顶部
-            fileList.prepend(item);
-            return item;
-        }
-        
-        function updateUploadProgress(uploadId, percent) {
-            const item = document.getElementById(uploadId);
-            if (item) {
-                const progressBar = item.querySelector('.progress-bar');
-                if (progressBar) {
-                    progressBar.style.width = percent + '%';
-                }
-            }
         }
         
         function handleUploadComplete(uploadId, xhr, file) {
@@ -808,21 +981,24 @@
                 
                 if (xhr.status === 200 && response.success) {
                     // 上传成功
-                    upload.item.querySelector('.file-icon').textContent = '✅';
-                    upload.item.querySelector('.file-icon').style.background = '#27ae60';
-                    upload.item.querySelector('.progress-bar').style.background = '#27ae60';
+                    const fileId = response.uuid_filename || uploadId;
+                    const fileData = {
+                        id: fileId,
+                        name: file.name,
+                        original_name: file.name,
+                        size: file.size,
+                        uuid: fileId,
+                        filename: fileId
+                    };
                     
-                    // 显示成功信息
-                    const uuidFilename = response.uuid_filename || '未知UUID';
-                    upload.item.querySelector('.file-name').innerHTML = 
-                        `${file.name} <small style="color: #27ae60;">(上传成功)</small>`;
+                    // 添加到当前会话文件列表
+                    currentSessionFiles.push(fileData);
                     
-                    setTimeout(() => {
-                        if (upload.item.parentNode) {
-                            upload.item.remove();
-                        }
-                        loadFiles(); // 重新加载文件列表
-                    }, 1000);
+                    // 从上传列表中移除
+                    activeUploads.delete(uploadId);
+                    
+                    // 重新加载所有文件
+                    loadFiles();
                     
                 } else if (xhr.status === 401) {
                     // 未授权
@@ -836,33 +1012,24 @@
             } catch (error) {
                 handleUploadError(uploadId, file, '服务器响应错误');
             }
-            
-            activeUploads.delete(uploadId);
         }
         
         function handleUploadError(uploadId, file, error) {
             const upload = activeUploads.get(uploadId);
             if (!upload) return;
             
-            upload.item.querySelector('.file-icon').textContent = '❌';
-            upload.item.querySelector('.file-icon').style.background = '#e74c3c';
-            upload.item.querySelector('.file-name').innerHTML = `${file.name} <small style="color: #e74c3c;">(${error})</small>`;
-            upload.item.querySelector('.progress-bar').style.background = '#e74c3c';
-            upload.item.querySelector('.copy-btn').style.display = 'none';
+            // 添加到失败列表
+            failedUploads.push({ 
+                name: file.name, 
+                error: error,
+                size: file.size
+            });
             
-            failedUploads.push({ name: file.name, error });
-            
-            setTimeout(() => {
-                if (upload.item.parentNode) {
-                    upload.item.remove();
-                }
-                updateStats(currentFiles.length,
-                           currentFiles.reduce((s, f) => s + (f.size || 0), 0),
-                           currentFiles.length,
-                           failedUploads.length);
-            }, 3000);
-            
+            // 从上传列表中移除
             activeUploads.delete(uploadId);
+            
+            // 更新显示
+            updateDisplay();
         }
         
         // ==================== 全局函数 ====================
@@ -870,17 +1037,7 @@
             const upload = activeUploads.get(uploadId);
             if (upload && upload.xhr) {
                 upload.xhr.abort();
-                upload.item.querySelector('.file-icon').textContent = '⏹️';
-                upload.item.querySelector('.file-icon').style.background = '#7f8c8d';
-                upload.item.querySelector('.file-name').innerHTML = `${upload.file.name} <small style="color: #999;">(已取消)</small>`;
-                
-                setTimeout(() => {
-                    if (upload.item.parentNode) {
-                        upload.item.remove();
-                    }
-                }, 1000);
-                
-                activeUploads.delete(uploadId);
+                handleUploadError(uploadId, upload.file, '已取消');
             }
         };
         
@@ -905,6 +1062,95 @@
                 document.body.removeChild(textarea);
             }
         };
+        
+        // ==================== 批量复制功能 ====================
+        async function batchCopyCurrent() {
+            if (currentViewMode !== 'current') {
+                // 切换到当前视图
+                switchView('current');
+                // 等待视图更新
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            const filesToCopy = [...currentSessionFiles];
+            
+            if (filesToCopy.length === 0) {
+                alert('当前没有可复制的文件');
+                return;
+            }
+            
+            const serverUrl = window.location.origin;
+            let allLinks = '';
+            
+            filesToCopy.forEach((file, index) => {
+                const displayName = file.original_name || file.name || file.filename;
+                const fileId = file.uuid || file.filename;
+                const fileUrl = `${serverUrl}/download/${fileId}`;
+                allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
+            });
+            
+            try {
+                await navigator.clipboard.writeText(allLinks);
+                alert(`✅ 已复制 ${filesToCopy.length} 个当前文件的链接到剪贴板！`);
+            } catch (err) {
+                // 备用方法
+                const textarea = document.createElement('textarea');
+                textarea.value = allLinks;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert(`✅ 已复制 ${filesToCopy.length} 个当前文件的链接到剪贴板！`);
+            }
+        }
+        
+        async function batchCopyAll() {
+            if (currentFiles.length === 0) {
+                alert('没有文件可以复制');
+                return;
+            }
+            
+            const serverUrl = window.location.origin;
+            let allLinks = '';
+            
+            currentFiles.forEach((file, index) => {
+                const displayName = file.original_name || file.name || file.filename;
+                const fileId = file.uuid || file.filename;
+                const fileUrl = `${serverUrl}/download/${fileId}`;
+                allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
+            });
+            
+            try {
+                await navigator.clipboard.writeText(allLinks);
+                alert(`✅ 已复制 ${currentFiles.length} 个所有文件的链接到剪贴板！`);
+            } catch (err) {
+                // 备用方法
+                const textarea = document.createElement('textarea');
+                textarea.value = allLinks;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert(`✅ 已复制 ${currentFiles.length} 个所有文件的链接到剪贴板！`);
+            }
+        }
+        
+        // ==================== 视图切换 ====================
+        function switchView(view) {
+            currentViewMode = view;
+            
+            // 更新按钮状态
+            if (view === 'current') {
+                currentViewBtn.classList.add('active');
+                allViewBtn.classList.remove('active');
+            } else {
+                currentViewBtn.classList.remove('active');
+                allViewBtn.classList.add('active');
+            }
+            
+            // 更新显示
+            updateDisplay();
+        }
         
         // ==================== 事件监听 ====================
         // 密码验证
@@ -998,50 +1244,15 @@
             });
         });
         
-        // 批量复制
-        batchCopyBtn.addEventListener('click', async () => {
-            try {
-                const response = await fetch('/files');
-                if (!response.ok) throw new Error('获取文件列表失败');
-                
-                const data = await response.json();
-                if (!data.success) throw new Error(data.message);
-                
-                const files = data.files || [];
-                if (files.length === 0) {
-                    alert('没有文件可以复制');
-                    return;
-                }
-                
-                const serverUrl = window.location.origin;
-                let allLinks = '';
-                
-                files.forEach((file, index) => {
-                    const displayName = file.original_name || file.name || file.filename;
-                    const fileId = file.uuid || file.filename;
-                    const fileUrl = `${serverUrl}/download/${fileId}`;
-                    allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
-                });
-                
-                try {
-                    await navigator.clipboard.writeText(allLinks);
-                    alert(`✅ 已复制 ${files.length} 个文件的链接到剪贴板！`);
-                } catch (err) {
-                    // 备用方法
-                    const textarea = document.createElement('textarea');
-                    textarea.value = allLinks;
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    alert(`✅ 已复制 ${files.length} 个文件的链接到剪贴板！`);
-                }
-                
-            } catch (error) {
-                console.error('批量复制失败:', error);
-                alert('批量复制失败: ' + error.message);
-            }
-        });
+        // 批量复制当前
+        batchCopyCurrentBtn.addEventListener('click', batchCopyCurrent);
+        
+        // 批量复制所有
+        batchCopyAllBtn.addEventListener('click', batchCopyAll);
+        
+        // 视图切换
+        currentViewBtn.addEventListener('click', () => switchView('current'));
+        allViewBtn.addEventListener('click', () => switchView('all'));
         
         // ==================== 初始化 ====================
         async function init() {
@@ -1049,7 +1260,7 @@
             
             // 每30秒刷新文件列表
             setInterval(async () => {
-                if (isAuthenticated) {
+                if (isAuthenticated && currentViewMode === 'all') {
                     await loadFiles();
                 }
             }, 30000);

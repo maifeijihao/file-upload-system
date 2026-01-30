@@ -9,293 +9,158 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
         }
         
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background-color: #f5f5f5;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            width: 100%;
-            max-width: 1000px;
-            margin: 40px 20px;
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            font-weight: 300;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1rem;
-        }
-        
-        .main-content {
-            padding: 40px;
-        }
-        
-        /* 密码验证弹窗 */
-        .password-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        
-        .password-box {
-            background: white;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 400px;
-            overflow: hidden;
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .password-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-        
-        .password-header h2 {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
-        }
-        
-        .password-body {
-            padding: 30px;
-        }
-        
-        .password-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            transition: border-color 0.3s;
-        }
-        
-        .password-input:focus {
-            border-color: #667eea;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .password-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: transform 0.2s;
-        }
-        
-        .password-btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        .password-error {
-            color: #ff4757;
-            font-size: 14px;
-            margin-top: 10px;
-            text-align: center;
-            display: none;
-        }
-        
-        /* 上传区域 */
-        .upload-section {
-            margin-bottom: 40px;
-        }
-        
-        .upload-box {
-            border: 3px dashed #ddd;
-            border-radius: 15px;
-            padding: 60px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #f8f9fa;
+            max-width: 1200px;
+            margin: 0 auto;
             position: relative;
         }
         
-        .upload-box:hover {
-            border-color: #667eea;
-            background: #f0f2ff;
-        }
-        
-        .upload-box.dragover {
-            border-color: #667eea;
-            background: #e8ebff;
-        }
-        
-        .upload-icon {
-            font-size: 60px;
-            color: #667eea;
-            margin-bottom: 20px;
-        }
-        
-        .upload-box h3 {
-            font-size: 1.5rem;
+        h1 {
+            text-align: center;
+            margin: 20px 0 30px;
             color: #333;
-            margin-bottom: 10px;
         }
         
-        .upload-box p {
-            color: #666;
-            margin-bottom: 20px;
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #4a90e2;
+            background-color: #f9f9f9;
+        }
+        
+        .upload-area.dragover {
+            border-color: #4a90e2;
+            background-color: #f0f7ff;
         }
         
         .upload-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #4a90e2;
             color: white;
             border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
+            padding: 12px 24px;
+            border-radius: 4px;
             font-size: 16px;
-            font-weight: 600;
             cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.3s;
+            margin-top: 10px;
         }
         
         .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            background-color: #3a7bc8;
+        }
+        
+        .upload-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         
         .file-input {
             display: none;
         }
         
-        /* 文件列表区域 */
-        .files-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-            margin-top: 30px;
-        }
-        
-        .stats-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
+        .files-container {
+            background-color: #fff;
+            border-radius: 8px;
             padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
         }
         
-        .stats {
+        .stats-row {
             display: flex;
-            gap: 30px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .stats-left {
+            display: flex;
+            gap: 25px;
         }
         
         .stat-item {
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .stat-label {
-            font-size: 0.9rem;
             color: #666;
+            font-size: 14px;
         }
         
-        .file-count { color: #667eea; }
-        .total-size { color: #764ba2; }
-        .success-count { color: #00b894; }
-        .failed-count { color: #ff4757; }
+        .stat-value {
+            font-weight: bold;
+            font-size: 16px;
+            min-width: 25px;
+            text-align: center;
+        }
         
-        .batch-btn {
-            background: #00b894;
+        .file-count {
+            color: #4a90e2;
+        }
+        
+        .total-size {
+            color: #9b59b6;
+        }
+        
+        .success-count {
+            color: #27ae60;
+        }
+        
+        .failed-count {
+            color: #e74c3c;
+        }
+        
+        .batch-copy-btn {
+            background-color: #9b59b6;
             color: white;
             border: none;
             padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
+            border-radius: 4px;
+            font-size: 14px;
             cursor: pointer;
-            transition: all 0.3s;
+            white-space: nowrap;
         }
         
-        .batch-btn:hover:not(:disabled) {
-            background: #00a085;
-            transform: translateY(-2px);
+        .batch-copy-btn:hover {
+            background-color: #8e44ad;
         }
         
-        .batch-btn:disabled {
-            background: #ccc;
+        .batch-copy-btn:disabled {
+            background-color: #cccccc;
             cursor: not-allowed;
         }
         
-        /* 文件列表 */
         .file-list {
             max-height: 400px;
             overflow-y: auto;
         }
         
         .file-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            transition: all 0.3s;
         }
         
-        .file-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .file-item:last-child {
+            border-bottom: none;
         }
         
         .file-info {
@@ -307,7 +172,7 @@
         .file-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4a90e2 0%, #9b59b6 100%);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -321,43 +186,200 @@
         }
         
         .file-name {
-            font-weight: 600;
+            font-weight: bold;
             color: #333;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             margin-bottom: 5px;
         }
         
         .file-size {
             color: #666;
-            font-size: 0.9rem;
+            font-size: 14px;
         }
         
-        .file-actions {
-            display: flex;
-            gap: 10px;
+        .file-uuid {
+            color: #999;
+            font-size: 11px;
+            margin-top: 3px;
         }
         
         .copy-btn {
-            background: #0984e3;
+            background-color: #7f8c8d;
             color: white;
             border: none;
             padding: 8px 16px;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s;
+            font-size: 14px;
         }
         
         .copy-btn:hover {
-            background: #0770c4;
+            background-color: #6c7b7d;
         }
         
         .empty-message {
             text-align: center;
-            padding: 60px 20px;
             color: #999;
+            padding: 40px 0;
         }
         
-        /* 进度条 */
+        /* 密码验证弹窗样式 */
+        .password-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .password-modal-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        
+        .password-modal-header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .password-modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .password-modal-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .password-modal-body {
+            padding: 25px;
+        }
+        
+        .password-input-group {
+            margin-bottom: 20px;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .password-input:focus {
+            border-color: #4a90e2;
+            outline: none;
+        }
+        
+        .password-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .password-modal-btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .password-modal-submit {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .password-modal-submit:hover {
+            background-color: #219653;
+        }
+        
+        .password-error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+        
+        .password-error.show {
+            display: block;
+        }
+        
+        /* 已登录状态样式 */
+        .auth-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+        
+        .auth-status.show {
+            display: block;
+        }
+        
+        .auth-logout {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .lock-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #ccc;
+            z-index: 1;
+        }
+        
+        .locked {
+            position: relative;
+        }
+        
+        .locked::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            z-index: 1;
+        }
+        
+        /* 上传进度条 */
         .progress-container {
             width: 100%;
             height: 6px;
@@ -370,155 +392,106 @@
         
         .progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #4a90e2 0%, #9b59b6 100%);
             width: 0%;
             transition: width 0.3s;
         }
         
-        /* 认证状态 */
-        .auth-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: 600;
-            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.3);
-            z-index: 100;
-            animation: slideInRight 0.3s ease;
-            display: none;
-        }
-        
-        .logout-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 15px;
-            margin-left: 10px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        /* 响应式设计 */
         @media (max-width: 768px) {
-            .container {
-                margin: 20px 10px;
+            body {
+                padding: 10px;
             }
             
-            .main-content {
-                padding: 20px;
-            }
-            
-            .stats-bar {
+            .stats-row {
                 flex-direction: column;
-                gap: 20px;
+                gap: 15px;
+                align-items: stretch;
             }
             
-            .stats {
+            .stats-left {
                 flex-wrap: wrap;
                 justify-content: center;
-            }
-            
-            .file-item {
-                flex-direction: column;
-                align-items: stretch;
                 gap: 15px;
             }
             
-            .file-actions {
-                justify-content: flex-end;
+            .file-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            
+            .file-name {
+                max-width: 200px;
+            }
+            
+            .auth-status {
+                position: static;
+                margin-bottom: 15px;
+                text-align: center;
             }
         }
     </style>
 </head>
 <body>
     <!-- 密码验证弹窗 -->
-    <div id="passwordModal" class="password-modal">
-        <div class="password-box">
-            <div class="password-header">
-                <h2>🔒 安全验证</h2>
-                <p>请输入密码访问文件系统</p>
+    <div class="password-modal-overlay" id="passwordModal">
+        <div class="password-modal-content">
+            <div class="password-modal-header">
+                <div class="password-modal-title">密码验证</div>
+                <div class="password-modal-subtitle">请输入访问密码以使用上传功能</div>
             </div>
-            <div class="password-body">
-                <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" autocomplete="current-password">
-                <button id="passwordSubmit" class="password-btn">验证并进入</button>
-                <div id="passwordError" class="password-error">密码错误，请重试</div>
+            <div class="password-modal-body">
+                <div class="password-input-group">
+                    <input type="password" class="password-input" id="passwordInput" placeholder="请输入访问密码" autocomplete="current-password">
+                    <div class="password-error" id="passwordError">密码错误，请重试</div>
+                </div>
+                <div class="password-modal-footer">
+                    <button class="password-modal-btn password-modal-submit" id="passwordSubmitBtn">验证</button>
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- 认证状态提示 -->
-    <div id="authStatus" class="auth-status">
-        <span>已认证用户</span>
-        <button id="logoutBtn" class="logout-btn">退出</button>
+    
+    <!-- 已登录状态提示 -->
+    <div class="auth-status" id="authStatus">
+        已通过验证
+        <button class="auth-logout" id="logoutBtn">退出</button>
     </div>
-
-    <div class="container">
-        <div class="header">
-            <h1>📁 文件上传与管理系统</h1>
-            <p>安全、快速的文件上传与分享平台</p>
+    
+    <h1>压缩包上传与下载</h1>
+    
+    <div class="upload-area" id="uploadBox">
+        <p>拖放文件到此处或点击按钮选择</p>
+        <button class="upload-btn" id="selectFileBtn">选择压缩包文件</button>
+        <input type="file" class="file-input" id="fileInput" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
+        <div class="lock-icon" id="lockIcon">🔒</div>
+    </div>
+    
+    <div class="files-container" id="filesContainer">
+        <div class="stats-row">
+            <div class="stats-left">
+                <div class="stat-item">
+                    <span class="stat-label">文件数量:</span>
+                    <span class="stat-value file-count" id="totalFiles">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">总大小:</span>
+                    <span class="stat-value total-size" id="totalSize">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">成功:</span>
+                    <span class="stat-value success-count" id="successCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">失败:</span>
+                    <span class="stat-value failed-count" id="failedCount">0</span>
+                </div>
+            </div>
+            <button class="batch-copy-btn" id="batchCopyBtn" disabled>批量复制所有链接</button>
         </div>
-
-        <div class="main-content">
-            <!-- 上传区域 -->
-            <div class="upload-section">
-                <div id="uploadBox" class="upload-box">
-                    <div class="upload-icon">📤</div>
-                    <h3>拖放文件到此处上传</h3>
-                    <p>支持 ZIP, RAR, 7Z, TAR, GZ 格式，最大 1GB</p>
-                    <button id="selectFileBtn" class="upload-btn">
-                        <span>📁</span> 选择文件
-                    </button>
-                    <input type="file" id="fileInput" class="file-input" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
-                </div>
-            </div>
-
-            <!-- 文件列表区域 -->
-            <div class="files-section">
-                <div class="stats-bar">
-                    <div class="stats">
-                        <div class="stat-item">
-                            <span id="totalFiles" class="stat-value file-count">0</span>
-                            <span class="stat-label">文件数量</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="totalSize" class="stat-value total-size">0</span>
-                            <span class="stat-label">总大小</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="successCount" class="stat-value success-count">0</span>
-                            <span class="stat-label">成功</span>
-                        </div>
-                        <div class="stat-item">
-                            <span id="failedCount" class="stat-value failed-count">0</span>
-                            <span class="stat-label">失败</span>
-                        </div>
-                    </div>
-                    <button id="batchCopyBtn" class="batch-btn" disabled>📋 批量复制链接</button>
-                </div>
-
-                <div id="fileList" class="file-list">
-                    <div class="empty-message">
-                        <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
-                        <h3>暂无文件</h3>
-                        <p>上传文件后，它们会显示在这里</p>
-                    </div>
-                </div>
-            </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="empty-message" id="noFilesMessage">暂无上传文件</div>
         </div>
     </div>
 
@@ -526,7 +499,7 @@
         // ==================== DOM 元素 ====================
         const passwordModal = document.getElementById('passwordModal');
         const passwordInput = document.getElementById('passwordInput');
-        const passwordSubmit = document.getElementById('passwordSubmit');
+        const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
         const passwordError = document.getElementById('passwordError');
         const authStatus = document.getElementById('authStatus');
         const logoutBtn = document.getElementById('logoutBtn');
@@ -535,6 +508,7 @@
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
         const batchCopyBtn = document.getElementById('batchCopyBtn');
+        const lockIcon = document.getElementById('lockIcon');
         
         // 统计元素
         const totalFilesEl = document.getElementById('totalFiles');
@@ -551,9 +525,9 @@
         
         // ==================== 工具函数 ====================
         function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
+            if (bytes === 0) return '0 Bytes';
             const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
@@ -606,17 +580,21 @@
             
             if (isAuthenticated) {
                 passwordModal.style.display = 'none';
-                authStatus.style.display = 'block';
-                uploadBox.style.pointerEvents = 'auto';
-                uploadBox.style.opacity = '1';
+                authStatus.classList.add('show');
+                uploadBox.classList.remove('locked');
+                lockIcon.style.display = 'none';
                 selectFileBtn.disabled = false;
+                uploadBox.style.cursor = 'pointer';
+                selectFileBtn.style.cursor = 'pointer';
                 await loadFiles();
             } else {
                 passwordModal.style.display = 'flex';
-                authStatus.style.display = 'none';
-                uploadBox.style.pointerEvents = 'none';
-                uploadBox.style.opacity = '0.5';
+                authStatus.classList.remove('show');
+                uploadBox.classList.add('locked');
+                lockIcon.style.display = 'block';
                 selectFileBtn.disabled = true;
+                uploadBox.style.cursor = 'not-allowed';
+                selectFileBtn.style.cursor = 'not-allowed';
                 showEmptyState('请先通过密码验证');
                 updateStats(0, 0, 0, 0);
             }
@@ -657,11 +635,9 @@
             
             files.forEach(file => {
                 totalSize += file.size || 0;
-                // 使用原始文件名显示，但下载链接使用UUID
                 const displayName = file.original_name || file.name || file.filename;
                 const fileSize = formatFileSize(file.size || 0);
-                const fileId = file.uuid || file.filename; // UUID文件名
-                const downloadUrl = `/download/${fileId}`; // 使用UUID构建下载链接
+                const fileId = file.uuid || file.filename;
                 const fileExt = getFileExtension(displayName).toLowerCase();
                 
                 // 根据文件类型设置图标
@@ -679,7 +655,7 @@
                             <div class="file-details">
                                 <div class="file-name" title="${displayName}">${displayName}</div>
                                 <div class="file-size">${fileSize}</div>
-                                <div style="font-size: 11px; color: #999; margin-top: 3px;">
+                                <div class="file-uuid">
                                     文件ID: ${fileId.substring(0, 8)}...
                                 </div>
                             </div>
@@ -779,8 +755,9 @@
         
         function createUploadItem(file, uploadId) {
             // 移除空状态
-            if (fileList.querySelector('.empty-message')) {
-                fileList.innerHTML = '';
+            const noFilesMessage = document.getElementById('noFilesMessage');
+            if (noFilesMessage && noFilesMessage.parentNode) {
+                noFilesMessage.remove();
             }
             
             const item = document.createElement('div');
@@ -798,7 +775,7 @@
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="copy-btn" style="background: #ff4757;" onclick="cancelUpload('${uploadId}')">
+                    <button class="copy-btn" style="background-color: #e74c3c;" onclick="cancelUpload('${uploadId}')">
                         取消
                     </button>
                 </div>
@@ -832,12 +809,13 @@
                 if (xhr.status === 200 && response.success) {
                     // 上传成功
                     upload.item.querySelector('.file-icon').textContent = '✅';
-                    upload.item.querySelector('.progress-bar').style.background = '#00b894';
+                    upload.item.querySelector('.file-icon').style.background = '#27ae60';
+                    upload.item.querySelector('.progress-bar').style.background = '#27ae60';
                     
                     // 显示成功信息
                     const uuidFilename = response.uuid_filename || '未知UUID';
                     upload.item.querySelector('.file-name').innerHTML = 
-                        `${file.name} <small style="color: #00b894;">(上传成功)</small>`;
+                        `${file.name} <small style="color: #27ae60;">(上传成功)</small>`;
                     
                     setTimeout(() => {
                         if (upload.item.parentNode) {
@@ -867,8 +845,9 @@
             if (!upload) return;
             
             upload.item.querySelector('.file-icon').textContent = '❌';
-            upload.item.querySelector('.file-name').innerHTML = `${file.name} <small style="color: #ff4757;">(${error})</small>`;
-            upload.item.querySelector('.progress-bar').style.background = '#ff4757';
+            upload.item.querySelector('.file-icon').style.background = '#e74c3c';
+            upload.item.querySelector('.file-name').innerHTML = `${file.name} <small style="color: #e74c3c;">(${error})</small>`;
+            upload.item.querySelector('.progress-bar').style.background = '#e74c3c';
             upload.item.querySelector('.copy-btn').style.display = 'none';
             
             failedUploads.push({ name: file.name, error });
@@ -892,6 +871,7 @@
             if (upload && upload.xhr) {
                 upload.xhr.abort();
                 upload.item.querySelector('.file-icon').textContent = '⏹️';
+                upload.item.querySelector('.file-icon').style.background = '#7f8c8d';
                 upload.item.querySelector('.file-name').innerHTML = `${upload.file.name} <small style="color: #999;">(已取消)</small>`;
                 
                 setTimeout(() => {
@@ -928,11 +908,11 @@
         
         // ==================== 事件监听 ====================
         // 密码验证
-        passwordSubmit.addEventListener('click', async () => {
+        passwordSubmitBtn.addEventListener('click', async () => {
             const password = passwordInput.value.trim();
             if (!password) {
                 passwordError.textContent = '请输入密码';
-                passwordError.style.display = 'block';
+                passwordError.classList.add('show');
                 return;
             }
             
@@ -940,11 +920,11 @@
             
             if (result.success) {
                 await updateAuthStatus();
-                passwordError.style.display = 'none';
+                passwordError.classList.remove('show');
                 passwordInput.value = '';
             } else {
                 passwordError.textContent = result.message || '密码错误';
-                passwordError.style.display = 'block';
+                passwordError.classList.add('show');
                 passwordInput.value = '';
                 passwordInput.focus();
             }
@@ -952,7 +932,7 @@
         
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                passwordSubmit.click();
+                passwordSubmitBtn.click();
             }
         });
         

@@ -13,6 +13,27 @@
 
 ## 安装方法
 
-### 方法一：一键安装
+### 第一步：
 ```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/file-upload-system/main/install.sh | sudo bash
+# 先下载脚本
+TOKEN="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"
+curl -H "Authorization: token $TOKEN" \
+     -H "Accept: application/vnd.github.v3.raw" \
+     -s https://api.github.com/repos/maifeijihao/file-upload-system/contents/upload-install.sh \
+     -o /tmp/file-upload-install.sh
+
+# 再运行脚本
+sudo bash /tmp/file-upload-install.sh
+
+### 第二步：
+```bash
+TOKEN="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"
+
+# 下载 index.html 文件到 /opt/file-upload-uuid 目录，替换现有文件
+curl -H "Authorization: token $TOKEN" \
+     -H "Accept: application/vnd.github.v3.raw" \
+     -s "https://api.github.com/repos/maifeijihao/file-upload-system/contents/index.html" \
+     -o /opt/file-upload-uuid/index.html
+
+# 运行脚本
+cd /opt/file-upload-uuid && ./restart.sh

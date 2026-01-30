@@ -4,7 +4,7 @@ PASSWORD = ""
 START_PORT = 5000
 
 def find_available_port(start_port):
-    """Ѱ�ҿ��ö˿�"""
+    """Ñ°ÕÒ¿ÉÓÃ¶Ë¿Ú"""
     port = start_port
     max_port = start_port + 100
     

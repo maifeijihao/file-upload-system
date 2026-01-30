@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================"
-echo "文件上传系统安装脚本 (UUID版本) - 含防火墙配置"
+echo "文件上传系统安装脚本 (UUID版本) - 含防火墙和服务配置"
 echo "========================================"
 echo ""
 
@@ -13,6 +13,15 @@ fi
 
 # 定义项目根目录
 PROJECT_ROOT="/opt/file-upload-uuid"
+SERVICE_NAME="file-upload-uuid"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+
+# 停止并禁用可能存在的旧服务
+echo "0. 清理可能存在的旧服务..."
+systemctl stop $SERVICE_NAME 2>/dev/null
+systemctl disable $SERVICE_NAME 2>/dev/null
+pkill -f "python3 server.py" 2>/dev/null
+sleep 2
 
 # 更新系统并安装必要软件
 echo "1. 正在更新系统和安装必要软件..."
@@ -652,12 +661,27 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             margin: 20px 0;
             text-align: left;
         }
+        .service-note {
+            background-color: #e7f3ff;
+            border-left: 4px solid #1890ff;
+            color: #0d47a1;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="icon">📁</div>
         <h1>文件上传系统</h1>
+        
+        <div class="service-note">
+            <strong>✅ 系统服务已配置！</strong>
+            <p>服务已在后台运行，关闭终端后不会停止。</p>
+            <p>系统重启后会自动启动。</p>
+            <p>管理命令：<span class="code">sudo systemctl status file-upload-uuid</span></p>
+        </div>
         
         <div class="firewall-note">
             <strong>防火墙已自动配置！</strong>
@@ -685,72 +709,105 @@ cat > $PROJECT_ROOT/index.html << HTML_END
             <ol class="steps">
                 <li>将你的 <span class="code">index.html</span> 文件上传到服务器</li>
                 <li>复制到安装目录：<span class="code">sudo cp /path/to/your/index.html $PROJECT_ROOT/</span></li>
-                <li>重启服务：<span class="code">cd $PROJECT_ROOT && ./restart.sh</span></li>
+                <li>重启服务：<span class="code">sudo systemctl restart file-upload-uuid</span></li>
                 <li>刷新此页面查看效果</li>
             </ol>
         </div>
         
         <div class="info-box">
-            <h3>管理命令：</h3>
+            <h3>服务管理命令：</h3>
             <ul class="steps">
-                <li>查看状态：<span class="code">./status.sh</span></li>
-                <li>启动服务：<span class="code">./start.sh</span></li>
-                <li>停止服务：<span class="code">./stop.sh</span></li>
-                <li>重启服务：<span class="code">./restart.sh</span></li>
+                <li>查看状态：<span class="code">sudo systemctl status file-upload-uuid</span></li>
+                <li>启动服务：<span class="code">sudo systemctl start file-upload-uuid</span></li>
+                <li>停止服务：<span class="code">sudo systemctl stop file-upload-uuid</span></li>
+                <li>重启服务：<span class="code">sudo systemctl restart file-upload-uuid</span></li>
+                <li>查看日志：<span class="code">sudo journalctl -u file-upload-uuid -f</span></li>
+                <li>开机自启：<span class="code">sudo systemctl enable file-upload-uuid</span></li>
+                <li>禁用自启：<span class="code">sudo systemctl disable file-upload-uuid</span></li>
+            </ul>
+            
+            <h3>脚本管理命令：</h3>
+            <ul class="steps">
                 <li>修改密码：<span class="code">sudo ./change-password.sh</span></li>
                 <li>防火墙管理：<span class="code">sudo ./firewall-setup.sh</span></li>
+                <li>清理文件：<span class="code">./cleanup.sh</span></li>
             </ul>
         </div>
         
         <div style="margin-top: 30px;">
             <p>安装目录：<span class="code">$PROJECT_ROOT</span></p>
             <p>上传目录：<span class="code">$PROJECT_ROOT/uploads</span></p>
+            <p>服务文件：<span class="code">/etc/systemd/system/file-upload-uuid.service</span></p>
         </div>
     </div>
 </body>
 </html>
 HTML_END
 
-# 创建启动脚本
-echo "10. 创建启动脚本..."
+# 创建启动脚本（前台运行）
+echo "10. 创建前台启动脚本..."
 cat > $PROJECT_ROOT/start.sh << START_EOF
 #!/bin/bash
 cd $PROJECT_ROOT
+echo "启动文件上传系统（前台运行）..."
+echo "按 Ctrl+C 停止"
 python3 server.py
 START_EOF
 
 chmod +x $PROJECT_ROOT/start.sh
 
+# 创建后台启动脚本
+echo "11. 创建后台启动脚本..."
+cat > $PROJECT_ROOT/start-background.sh << START_BG_EOF
+#!/bin/bash
+cd $PROJECT_ROOT
+echo "启动文件上传系统（后台运行）..."
+nohup python3 server.py > server.log 2>&1 &
+echo "进程PID: \$!"
+echo "日志文件: $PROJECT_ROOT/server.log"
+echo "查看日志: tail -f server.log"
+echo "停止命令: pkill -f 'python3 server.py'"
+START_BG_EOF
+
+chmod +x $PROJECT_ROOT/start-background.sh
+
 # 创建停止脚本
-echo "11. 创建停止脚本..."
+echo "12. 创建停止脚本..."
 cat > $PROJECT_ROOT/stop.sh << STOP_EOF
 #!/bin/bash
 echo "正在停止文件上传系统..."
 pkill -f "python3 server.py" 2>/dev/null
 sleep 2
-echo "已停止"
+echo "已停止前台进程"
+
+# 同时停止systemd服务（如果存在）
+if systemctl is-active --quiet file-upload-uuid 2>/dev/null; then
+    echo "停止systemd服务..."
+    systemctl stop file-upload-uuid
+fi
 STOP_EOF
 
 chmod +x $PROJECT_ROOT/stop.sh
 
 # 创建重启脚本
-echo "12. 创建重启脚本..."
+echo "13. 创建重启脚本..."
 cat > $PROJECT_ROOT/restart.sh << RESTART_EOF
 #!/bin/bash
 cd $PROJECT_ROOT
 ./stop.sh
 sleep 1
-./start.sh
+echo "重新启动..."
+./start-background.sh
 RESTART_EOF
 
 chmod +x $PROJECT_ROOT/restart.sh
 
 # 创建修改密码脚本
-echo "13. 创建密码修改脚本..."
+echo "14. 创建密码修改脚本..."
 cat > $PROJECT_ROOT/change-password.sh << CHANGE_PASS_EOF
 #!/bin/bash
 
-if [ "$EUID" -ne 0 ]; then 
+if [ "\$EUID" -ne 0 ]; then 
     echo "请使用 sudo 运行此脚本: sudo ./change-password.sh"
     exit 1
 fi
@@ -764,28 +821,28 @@ echo ""
 read -sp "请再次确认新密码: " NEW_PASSWORD_CONFIRM
 echo ""
 
-if [ "$NEW_PASSWORD" != "$NEW_PASSWORD_CONFIRM" ]; then
+if [ "\$NEW_PASSWORD" != "\$NEW_PASSWORD_CONFIRM" ]; then
     echo "错误：两次输入的密码不一致！"
     exit 1
 fi
 
-if [ -z "$NEW_PASSWORD" ]; then
+if [ -z "\$NEW_PASSWORD" ]; then
     echo "错误：密码不能为空！"
     exit 1
 fi
 
 # 更新配置文件
-OLD_PORT=$(grep "DEFAULT_PORT = " config.py | cut -d'=' -f2 | tr -d ' ')
+OLD_PORT=\$(grep "DEFAULT_PORT = " config.py | cut -d'=' -f2 | tr -d ' ')
 
 cat > config.py << CONFIG_UPDATE_END
 import hashlib
 import socket
 
 # 密码设置（安装时设置）
-ADMIN_PASSWORD = "$NEW_PASSWORD"
+ADMIN_PASSWORD = "\$NEW_PASSWORD"
 
 # 端口设置（保持原端口）
-DEFAULT_PORT = $OLD_PORT
+DEFAULT_PORT = \$OLD_PORT
 
 def verify_password(input_password):
     """验证密码"""
@@ -813,104 +870,145 @@ def find_available_port(start_port):
 CONFIG_UPDATE_END
 
 echo "✅ 密码修改成功！"
-echo "需要重启服务才能使新密码生效。"
-echo ""
-echo "重启命令:"
-echo "cd $PROJECT_ROOT && ./restart.sh"
+
+# 重启服务使新密码生效
+if systemctl is-active --quiet file-upload-uuid 2>/dev/null; then
+    echo "重启systemd服务..."
+    systemctl restart file-upload-uuid
+    echo "服务已重启，新密码立即生效。"
+else
+    echo "需要重启服务才能使新密码生效。"
+    echo "重启命令:"
+    echo "cd $PROJECT_ROOT && ./restart.sh"
+fi
 CHANGE_PASS_EOF
 
 chmod +x $PROJECT_ROOT/change-password.sh
 
 # 创建查看状态脚本
-echo "14. 创建查看状态脚本..."
+echo "15. 创建查看状态脚本..."
 cat > $PROJECT_ROOT/status.sh << STATUS_EOF
 #!/bin/bash
 echo "=== 文件上传系统状态 (UUID版本) ==="
 echo ""
 
-# 检查进程是否运行
-if pgrep -f "python3 server.py" > /dev/null; then
-    echo "✅ 服务状态: 运行中"
+# 检查systemd服务状态
+if systemctl is-active --quiet file-upload-uuid 2>/dev/null; then
+    echo "✅ 服务状态: systemd服务运行中"
     
     # 获取端口信息
-    PORT=$(netstat -tlnp 2>/dev/null | grep "python3" | grep "server.py" | awk '{print $4}' | cut -d':' -f2 | head -1)
+    PORT=\$(grep "DEFAULT_PORT = " config.py | cut -d'=' -f2 | tr -d ' ')
     
-    if [ -n "$PORT" ]; then
-        echo "📡 运行端口: $PORT"
+    if [ -n "\$PORT" ]; then
+        echo "📡 配置端口: \$PORT"
+        
+        # 检查端口是否在监听
+        if netstat -tln 2>/dev/null | grep -q ":\$PORT "; then
+            echo "✅ 端口状态: 正在监听"
+        else
+            echo "❌ 端口状态: 未监听"
+        fi
+    fi
+    
+    # 显示systemd服务状态
+    echo ""
+    echo "=== systemd服务状态 ==="
+    systemctl status file-upload-uuid --no-pager -l
+    
+elif pgrep -f "python3 server.py" > /dev/null; then
+    echo "✅ 服务状态: 后台进程运行中"
+    
+    # 获取端口信息
+    PORT=\$(netstat -tlnp 2>/dev/null | grep "python3" | grep "server.py" | awk '{print \$4}' | cut -d':' -f2 | head -1)
+    
+    if [ -n "\$PORT" ]; then
+        echo "📡 运行端口: \$PORT"
     else
-        PORT_INFO=$(ps aux | grep "python3 server.py" | grep -v grep | tr -s ' ' | cut -d' ' -f22 | grep -o "[0-9]*$")
-        if [ -n "$PORT_INFO" ]; then
-            echo "📡 运行端口: $PORT_INFO"
-            PORT=$PORT_INFO
+        PORT_INFO=\$(ps aux | grep "python3 server.py" | grep -v grep | tr -s ' ' | cut -d' ' -f22 | grep -o "[0-9]*\$")
+        if [ -n "\$PORT_INFO" ]; then
+            echo "📡 运行端口: \$PORT_INFO"
+            PORT=\$PORT_INFO
         else
             echo "📡 运行端口: 获取中..."
         fi
     fi
-    
-    # 获取IP地址
-    IP_ADDRESS=$(hostname -I | awk '{print $1}')
-    if [ -n "$PORT" ]; then
-        echo "🌐 访问地址: http://$IP_ADDRESS:$PORT"
-    else
-        echo "🌐 访问地址: 请查看启动日志"
-    fi
-    
-    # 统计上传文件
-    if [ -d "$PROJECT_ROOT/uploads" ]; then
-        FILE_COUNT=$(ls $PROJECT_ROOT/uploads/ 2>/dev/null | wc -l)
-        echo "📁 文件数量: $FILE_COUNT"
-        
-        TOTAL_SIZE=$(du -sh $PROJECT_ROOT/uploads 2>/dev/null | cut -f1)
-        echo "💾 总大小: $TOTAL_SIZE"
-    fi
-    
-    # 检查映射文件
-    if [ -f "$PROJECT_ROOT/file_mapping.json" ]; then
-        MAPPING_COUNT=$(grep -c '"original_name"' $PROJECT_ROOT/file_mapping.json 2>/dev/null || echo "0")
-        echo "🗂️  文件映射: $MAPPING_COUNT 条记录"
-    fi
-    
-    # 检查防火墙状态
-    echo ""
-    echo "=== 防火墙状态 ==="
-    
-    if command -v ufw >/dev/null 2>&1; then
-        if ufw status | grep -q "$PORT/tcp"; then
-            echo "✅ ufw: 端口 $PORT 已开放"
-        else
-            echo "❌ ufw: 端口 $PORT 未开放"
-        fi
-    fi
-    
-    if command -v iptables >/dev/null 2>&1; then
-        if iptables -L INPUT -n 2>/dev/null | grep -q "tcp dpt:$PORT"; then
-            echo "✅ iptables: 端口 $PORT 已开放"
-        else
-            echo "❌ iptables: 端口 $PORT 未开放"
-        fi
-    fi
-    
 else
     echo "❌ 服务状态: 未运行"
     echo ""
     echo "启动命令:"
-    echo "cd $PROJECT_ROOT && ./start.sh"
+    echo "- 前台启动: cd $PROJECT_ROOT && ./start.sh"
+    echo "- 后台启动: cd $PROJECT_ROOT && ./start-background.sh"
+    echo "- systemd启动: sudo systemctl start file-upload-uuid"
+fi
+
+# 获取IP地址
+IP_ADDRESS=\$(hostname -I | awk '{print \$1}')
+if [ -n "\$PORT" ]; then
+    echo "🌐 访问地址: http://\$IP_ADDRESS:\$PORT"
+    echo "🌐 本地访问: http://localhost:\$PORT"
+fi
+
+# 统计上传文件
+if [ -d "$PROJECT_ROOT/uploads" ]; then
+    FILE_COUNT=\$(ls $PROJECT_ROOT/uploads/ 2>/dev/null | wc -l)
+    echo "📁 文件数量: \$FILE_COUNT"
+    
+    TOTAL_SIZE=\$(du -sh $PROJECT_ROOT/uploads 2>/dev/null | cut -f1)
+    echo "💾 总大小: \$TOTAL_SIZE"
+fi
+
+# 检查映射文件
+if [ -f "$PROJECT_ROOT/file_mapping.json" ]; then
+    MAPPING_COUNT=\$(grep -c '"original_name"' $PROJECT_ROOT/file_mapping.json 2>/dev/null || echo "0")
+    echo "🗂️  文件映射: \$MAPPING_COUNT 条记录"
+fi
+
+# 检查防火墙状态
+if [ -n "\$PORT" ]; then
+    echo ""
+    echo "=== 防火墙状态 (端口 \$PORT) ==="
+    
+    if command -v ufw >/dev/null 2>&1; then
+        if ufw status | grep -q "\$PORT/tcp"; then
+            echo "✅ ufw: 端口 \$PORT 已开放"
+        else
+            echo "❌ ufw: 端口 \$PORT 未开放"
+        fi
+    fi
+    
+    if command -v iptables >/dev/null 2>&1; then
+        if iptables -L INPUT -n 2>/dev/null | grep -q "tcp dpt:\$PORT"; then
+            echo "✅ iptables: 端口 \$PORT 已开放"
+        else
+            echo "❌ iptables: 端口 \$PORT 未开放"
+        fi
+    fi
 fi
 
 echo ""
-echo "管理命令:"
-echo "- 启动: ./start.sh"
-echo "- 停止: ./stop.sh"
-echo "- 重启: ./restart.sh"
+echo "=== 管理命令 ==="
+echo "服务管理:"
+echo "- 启动: sudo systemctl start file-upload-uuid"
+echo "- 停止: sudo systemctl stop file-upload-uuid"
+echo "- 重启: sudo systemctl restart file-upload-uuid"
+echo "- 状态: sudo systemctl status file-upload-uuid"
+echo "- 日志: sudo journalctl -u file-upload-uuid -f"
+echo "- 自启: sudo systemctl enable file-upload-uuid"
+echo "- 禁用: sudo systemctl disable file-upload-uuid"
+echo ""
+echo "脚本管理:"
 echo "- 修改密码: sudo ./change-password.sh"
 echo "- 防火墙管理: sudo ./firewall-setup.sh"
 echo "- 清理文件: ./cleanup.sh"
+echo "- 前台启动: ./start.sh"
+echo "- 后台启动: ./start-background.sh"
+echo "- 停止进程: ./stop.sh"
 STATUS_EOF
 
 chmod +x $PROJECT_ROOT/status.sh
 
 # 创建清理脚本
-echo "15. 创建清理脚本..."
+echo "16. 创建清理脚本..."
 cat > $PROJECT_ROOT/cleanup.sh << CLEANUP_EOF
 #!/bin/bash
 echo "=== 清理文件上传系统 ==="
@@ -919,7 +1017,7 @@ echo ""
 
 read -p "确定要清理所有文件吗？(y/N): " CONFIRM
 
-if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+if [[ "\$CONFIRM" != "y" && "\$CONFIRM" != "Y" ]]; then
     echo "操作取消"
     exit 0
 fi
@@ -932,6 +1030,7 @@ cd $PROJECT_ROOT
 # 删除上传的文件
 rm -rf uploads/*
 rm -f file_mapping.json
+rm -f server.log 2>/dev/null
 
 # 重新创建目录
 mkdir -p uploads
@@ -939,15 +1038,60 @@ mkdir -p uploads
 echo ""
 echo "✅ 所有文件已清理！"
 echo "现在可以重新启动服务:"
-echo "cd $PROJECT_ROOT && ./start.sh"
+echo "前台启动: ./start.sh"
+echo "后台启动: ./start-background.sh"
+echo "systemd启动: sudo systemctl start file-upload-uuid"
 CLEANUP_EOF
 
 chmod +x $PROJECT_ROOT/cleanup.sh
 
+# 创建systemd服务文件
+echo "17. 创建systemd服务文件..."
+cat > $SERVICE_FILE << SERVICE_EOF
+[Unit]
+Description=File Upload System (UUID Version)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$PROJECT_ROOT
+ExecStart=/usr/bin/python3 $PROJECT_ROOT/server.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# 环境变量
+Environment="PYTHONUNBUFFERED=1"
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=$PROJECT_ROOT/uploads $PROJECT_ROOT
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
 # 设置目录权限
-echo "16. 设置目录权限..."
+echo "18. 设置目录权限..."
 chmod -R 755 $PROJECT_ROOT
 chmod 777 $PROJECT_ROOT/uploads
+
+# 重新加载systemd并启动服务
+echo "19. 配置并启动系统服务..."
+systemctl daemon-reload
+systemctl enable $SERVICE_NAME
+systemctl start $SERVICE_NAME
+
+# 等待服务启动
+sleep 3
+
+# 检查服务状态
+SERVICE_STATUS=$(systemctl is-active $SERVICE_NAME)
 
 # 获取服务器IP
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
@@ -966,29 +1110,52 @@ echo "   - 前端显示：原始文件名"
 echo "   - 下载链接：UUID格式"
 echo "   - 下载时显示：原始文件名"
 echo ""
+echo "服务状态：$SERVICE_STATUS"
+echo ""
+
+if [ "$SERVICE_STATUS" = "active" ]; then
+    echo "✅ 服务已成功启动并运行在后台！"
+    echo "✅ 系统重启后会自动启动"
+    echo ""
+    echo "访问地址: http://$IP_ADDRESS:$DEFAULT_PORT"
+    echo "本地访问: http://localhost:$DEFAULT_PORT"
+else
+    echo "⚠️  服务启动可能有问题，请检查状态"
+    echo "查看服务状态: sudo systemctl status $SERVICE_NAME"
+    echo "查看服务日志: sudo journalctl -u $SERVICE_NAME -f"
+fi
+
+echo ""
 echo "防火墙配置："
 echo "✅ 已尝试自动配置系统防火墙"
 echo "⚠️  如果仍无法访问，请检查："
 echo "   1. 云服务器安全组（控制台）"
 echo "   2. 使用防火墙管理工具: sudo ./firewall-setup.sh"
 echo ""
-echo "管理命令:"
-echo "- 查看状态: cd $PROJECT_ROOT && ./status.sh"
-echo "- 启动服务: cd $PROJECT_ROOT && ./start.sh"
-echo "- 停止服务: cd $PROJECT_ROOT && ./stop.sh"
-echo "- 重启服务: cd $PROJECT_ROOT && ./restart.sh"
+echo "=== 服务管理命令 ==="
+echo "1. 查看服务状态: sudo systemctl status $SERVICE_NAME"
+echo "2. 启动/停止/重启服务: sudo systemctl start|stop|restart $SERVICE_NAME"
+echo "3. 查看实时日志: sudo journalctl -u $SERVICE_NAME -f"
+echo "4. 查看所有日志: sudo journalctl -u $SERVICE_NAME"
+echo "5. 启用开机自启: sudo systemctl enable $SERVICE_NAME"
+echo "6. 禁用开机自启: sudo systemctl disable $SERVICE_NAME"
+echo ""
+echo "=== 脚本管理命令 ==="
+echo "- 查看详细状态: cd $PROJECT_ROOT && ./status.sh"
 echo "- 修改密码: cd $PROJECT_ROOT && sudo ./change-password.sh"
 echo "- 防火墙管理: cd $PROJECT_ROOT && sudo ./firewall-setup.sh"
 echo "- 清理文件: cd $PROJECT_ROOT && ./cleanup.sh"
+echo "- 前台运行: cd $PROJECT_ROOT && ./start.sh"
+echo "- 后台运行: cd $PROJECT_ROOT && ./start-background.sh"
 echo ""
 echo "安装目录: $PROJECT_ROOT"
 echo "上传目录: $PROJECT_ROOT/uploads"
 echo "映射文件: $PROJECT_ROOT/file_mapping.json"
+echo "服务文件: $SERVICE_FILE"
 echo ""
-echo "现在可以启动服务了："
-echo "cd $PROJECT_ROOT && ./start.sh"
-echo ""
-echo "访问地址: http://$IP_ADDRESS:$DEFAULT_PORT"
-echo ""
-echo "如果无法访问，请运行防火墙检查："
-echo "cd $PROJECT_ROOT && sudo ./firewall-setup.sh"
+
+if [ "$SERVICE_STATUS" != "active" ]; then
+    echo "⚠️  尝试手动启动服务..."
+    echo "cd $PROJECT_ROOT && ./start-background.sh"
+    echo "或检查端口是否被占用"
+fi

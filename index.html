@@ -600,10 +600,10 @@
         
         // 状态变量
         let isAuthenticated = false;
-        let activeUploads = new Map();
-        let failedUploads = [];
-        let currentFiles = []; // 从服务器获取的所有文件
-        let currentSessionFiles = []; // 当前会话上传的文件
+        let activeUploads = new Map(); // key: uploadId, value: { file, progress, xhr, startTime }
+        let failedUploads = []; // 每个元素: { name, error, size, failTime }
+        let currentFiles = []; // 从服务器获取的所有文件，每个文件对象会附加 _displayTime
+        let currentSessionFiles = []; // 当前会话上传的文件，每个文件对象会附加 _displayTime
         let currentViewMode = 'current'; // 'current' 或 'all'
         
         // ==================== 工具函数 ====================
@@ -697,7 +697,13 @@
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message);
                 
-                currentFiles = data.files || [];
+                // 为每个文件添加显示时间戳（如果还没有）
+                currentFiles = (data.files || []).map(file => {
+                    if (!file._displayTime) {
+                        file._displayTime = Date.now(); // 初次加载时记录当前时间作为排序依据
+                    }
+                    return file;
+                });
                 updateDisplay();
                 
             } catch (error) {
@@ -707,107 +713,143 @@
         }
         
         function updateDisplay() {
-            const filesToDisplay = currentViewMode === 'current' ? currentSessionFiles : currentFiles;
-            displayFiles(filesToDisplay);
-        }
-        
-        function displayFiles(files) {
-            if (!files || files.length === 0) {
-                showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
-                updateStats(0, 0, 0, 0);
-                return;
-            }
-            
-            let totalSize = 0;
-            let successCount = 0;
-            let html = '';
-            
-            // 显示当前上传的文件（包括上传中和已上传的）
             if (currentViewMode === 'current') {
-                // 显示上传中的文件
-                activeUploads.forEach((upload, uploadId) => {
-                    const file = upload.file;
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        uploadId,
-                        file.name,
-                        file.size,
-                        'uploading',
-                        upload.progress || 0
-                    );
+                // 构建所有待展示项（上传中、会话成功、失败）并排序
+                const items = [];
+                
+                // 上传中的文件
+                for (let [uploadId, upload] of activeUploads.entries()) {
+                    items.push({
+                        type: 'uploading',
+                        id: uploadId,
+                        fileName: upload.file.name,
+                        fileSize: upload.file.size,
+                        progress: upload.progress,
+                        uploadId: uploadId,
+                        startTime: upload.startTime,
+                        xhr: upload.xhr,
+                        file: upload.file
+                    });
+                }
+                
+                // 当前会话已上传成功的文件
+                for (let file of currentSessionFiles) {
+                    items.push({
+                        type: 'success',
+                        id: file.uuid || file.filename,
+                        fileName: file.original_name || file.name || file.filename,
+                        fileSize: file.size,
+                        displayTime: file._displayTime,
+                        fileData: file
+                    });
+                }
+                
+                // 上传失败的文件
+                for (let i = 0; i < failedUploads.length; i++) {
+                    const fail = failedUploads[i];
+                    items.push({
+                        type: 'failed',
+                        id: 'failed-' + i,
+                        fileName: fail.name,
+                        fileSize: fail.size,
+                        failTime: fail.failTime,
+                        error: fail.error
+                    });
+                }
+                
+                // 按时间降序排序（新的在前）
+                items.sort((a, b) => {
+                    let timeA = a.displayTime || a.startTime || a.failTime || 0;
+                    let timeB = b.displayTime || b.startTime || b.failTime || 0;
+                    return timeB - timeA;
                 });
                 
-                // 显示当前会话已上传的文件
-                files.forEach(file => {
-                    if (!activeUploads.has(file.id)) {
-                        totalSize += file.size || 0;
-                        successCount++;
-                        
-                        const displayName = file.original_name || file.name || file.filename;
-                        const fileId = file.uuid || file.filename;
-                        
+                // 渲染排序后的列表
+                if (items.length === 0) {
+                    showEmptyState('当前没有上传文件');
+                    updateStats(0, 0, 0, 0);
+                    return;
+                }
+                
+                let totalSize = 0;
+                let successCount = 0;
+                let failedCount = 0;
+                let html = '';
+                
+                for (let item of items) {
+                    totalSize += item.fileSize || 0;
+                    if (item.type === 'success') successCount++;
+                    if (item.type === 'failed') failedCount++;
+                    
+                    if (item.type === 'uploading') {
                         html += createFileItemHtml(
-                            fileId,
-                            displayName,
-                            file.size,
+                            item.id,
+                            item.fileName,
+                            item.fileSize,
+                            'uploading',
+                            item.progress,
+                            item.uploadId
+                        );
+                    } else if (item.type === 'success') {
+                        html += createFileItemHtml(
+                            item.id,
+                            item.fileName,
+                            item.fileSize,
                             'success'
                         );
+                    } else if (item.type === 'failed') {
+                        html += createFileItemHtml(
+                            item.id,
+                            item.fileName,
+                            item.fileSize,
+                            'failed'
+                        );
                     }
+                }
+                
+                fileList.innerHTML = html;
+                updateStats(items.length, totalSize, successCount, failedCount);
+                
+            } else {
+                // 所有文件视图：直接对 currentFiles 排序
+                const sortedFiles = [...currentFiles].sort((a, b) => {
+                    let timeA = a._displayTime || 0;
+                    let timeB = b._displayTime || 0;
+                    return timeB - timeA;
                 });
                 
-                // 显示失败的文件
-                failedUploads.forEach((file, index) => {
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        'failed-' + index,
-                        file.name,
-                        file.size,
-                        'failed'
-                    );
-                });
-            } else {
-                // 显示所有文件
-                files.forEach(file => {
+                if (sortedFiles.length === 0) {
+                    showEmptyState('暂无文件');
+                    updateStats(0, 0, 0, 0);
+                    return;
+                }
+                
+                let totalSize = 0;
+                let successCount = 0;
+                let html = '';
+                
+                for (let file of sortedFiles) {
                     totalSize += file.size || 0;
                     successCount++;
-                    
                     const displayName = file.original_name || file.name || file.filename;
                     const fileId = file.uuid || file.filename;
-                    
-                    html += createFileItemHtml(
-                        fileId,
-                        displayName,
-                        file.size,
-                        'success'
-                    );
-                });
+                    html += createFileItemHtml(fileId, displayName, file.size, 'success');
+                }
+                
+                fileList.innerHTML = html;
+                updateStats(sortedFiles.length, totalSize, successCount, 0);
             }
             
-            fileList.innerHTML = html;
-            
-            // 更新统计信息
-            const totalCount = currentViewMode === 'current' 
-                ? activeUploads.size + files.length + failedUploads.length
-                : files.length;
-            
-            const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
-            
-            updateStats(totalCount, totalSize, successCount, failedCount);
-            
             // 更新批量复制按钮状态
-            const hasFiles = currentViewMode === 'current' 
-                ? (activeUploads.size + files.length + failedUploads.length) > 0
-                : files.length > 0;
-                
+            const hasCurrentFiles = (currentViewMode === 'current' ? 
+                (activeUploads.size + currentSessionFiles.length + failedUploads.length) > 0 : 
+                currentFiles.length > 0);
             const hasAllFiles = currentFiles.length > 0;
-            
-            batchCopyCurrentBtn.disabled = !hasFiles;
+            batchCopyCurrentBtn.disabled = !hasCurrentFiles;
             batchCopyAllBtn.disabled = !hasAllFiles;
         }
         
-        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0, uploadId = null) {
             const fileExt = getFileExtension(fileName).toLowerCase();
             const fileSizeFormatted = formatFileSize(fileSize || 0);
             
@@ -820,13 +862,13 @@
                 statusText = '上传中';
                 statusClass = 'status-uploading';
                 actionButtons = `
-                    <button class="cancel-btn" onclick="cancelUpload('${fileId}')">取消</button>
+                    <button class="cancel-btn" onclick="cancelUpload('${uploadId}')">取消</button>
                 `;
             } else if (status === 'success') {
                 statusText = '已上传';
                 statusClass = 'status-success';
                 actionButtons = `
-                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName}')">复制链接</button>
+                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName.replace(/'/g, "\\'")}')">复制链接</button>
                 `;
             } else if (status === 'failed') {
                 statusText = '上传失败';
@@ -841,12 +883,11 @@
                 </div>
             ` : '';
             
-            // 移除了图标部分
             return `
                 <div class="file-item" data-id="${fileId}">
                     <div class="file-info">
                         <div class="file-details">
-                            <div class="file-name" title="${fileName}">
+                            <div class="file-name" title="${fileName.replace(/'/g, "\\'")}">
                                 ${fileName}
                                 <span class="file-status ${statusClass}">${statusText}</span>
                             </div>
@@ -889,7 +930,7 @@
             
             if (!allowedExts.includes(fileExt)) {
                 alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件 (ZIP, RAR, 7Z, TAR, GZ)`);
-                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size });
+                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size, failTime: Date.now() });
                 updateDisplay();
                 return;
             }
@@ -897,19 +938,22 @@
             // 验证文件大小 (1GB)
             if (file.size > 1024 * 1024 * 1024) {
                 alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
-                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size });
+                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size, failTime: Date.now() });
                 updateDisplay();
                 return;
             }
             
             // 创建上传项目
             const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const startTime = Date.now();
             
             // 存储上传信息
             activeUploads.set(uploadId, { 
                 file: file, 
                 progress: 0,
-                id: uploadId
+                id: uploadId,
+                startTime: startTime,
+                xhr: null
             });
             
             // 更新显示
@@ -969,7 +1013,8 @@
                         original_name: file.name,
                         size: file.size,
                         uuid: fileId,
-                        filename: fileId
+                        filename: fileId,
+                        _displayTime: Date.now()  // 记录成功时间用于排序
                     };
                     
                     // 添加到当前会话文件列表
@@ -978,7 +1023,7 @@
                     // 从上传列表中移除
                     activeUploads.delete(uploadId);
                     
-                    // 重新加载所有文件
+                    // 重新加载所有文件（也会刷新时间戳）
                     loadFiles();
                     
                 } else if (xhr.status === 401) {
@@ -1003,7 +1048,8 @@
             failedUploads.push({ 
                 name: file.name, 
                 error: error,
-                size: file.size
+                size: file.size,
+                failTime: Date.now()
             });
             
             // 从上传列表中移除

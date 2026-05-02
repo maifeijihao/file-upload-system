@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# 强制从终端读取输入，解决 curl ... | bash 时的交互问题
+exec < /dev/tty
+
 echo "========================================="
 echo "文件上传系统 - HTTPS 自动配置脚本"
 echo "========================================="
@@ -27,7 +30,7 @@ echo "[1/5] 安装 Nginx 和 Certbot..."
 apt update
 apt install -y nginx certbot python3-certbot-nginx
 
-# 2. 创建临时 Nginx 配置（仅 HTTP，用于验证域名）
+# 2. 创建临时 Nginx 配置（仅 HTTP）
 echo "[2/5] 创建 Nginx 配置..."
 cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
@@ -48,11 +51,11 @@ EOF
 ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
-# 3. 申请 SSL 证书（Certbot 会自动修改配置，增加 HTTPS 并可选重定向）
+# 3. 申请 SSL 证书（Certbot 会自动修改配置，增加 HTTPS 并开启重定向）
 echo "[3/5] 申请 Let's Encrypt 证书..."
 certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email "admin@$DOMAIN" --redirect
 
-# 4. 验证证书续期定时器
+# 4. 验证自动续期
 echo "[4/5] 检查自动续期状态..."
 systemctl enable certbot.timer
 systemctl start certbot.timer

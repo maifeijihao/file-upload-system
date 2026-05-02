@@ -5,18 +5,17 @@ echo "文件上传系统安装脚本 (UUID版本) - 含防火墙和服务配置"
 echo "========================================"
 
 echo "0. 清理可能存在的旧服务..."
-systemctl stop file-upload-uuid 2>/dev/null || true
-systemctl disable file-upload-uuid 2>/dev/null || true
+systemctl stop file-upload-uuid 2>/dev/null
+systemctl disable file-upload-uuid 2>/dev/null
 rm -f /etc/systemd/system/file-upload-uuid.service
 systemctl daemon-reload
 
 echo "1. 正在更新系统和安装必要软件..."
-apt-get update -y
-apt-get install -y python3 python3-pip python3-venv curl wget net-tools ufw
+apt-get update
+apt-get install -y python3 python3-pip curl wget net-tools ufw
 
-# 因 Ubuntu 24.04 限制，pip 安装需加 --break-system-packages
 echo "2. 安装 Python 依赖..."
-pip3 install --break-system-packages flask python-magic
+pip3 install flask python-magic
 
 echo "3. 创建项目目录..."
 mkdir -p /opt/file-upload-uuid/uploads
@@ -37,29 +36,21 @@ read -p "请输入端口号（默认5555）: " PORT
 PORT=${PORT:-5555}
 
 echo "6. 配置系统防火墙..."
-if command -v ufw &>/dev/null; then
-    ufw allow "$PORT"/tcp
-    echo "y" | ufw enable
-    echo "✅ 端口 $PORT 已开放，防火墙已启用"
-else
-    echo "⚠️ ufw 未安装，已跳过"
-fi
+ufw allow $PORT/tcp
+echo "y" | ufw enable
 
-echo "7. 下载核心文件..."
-curl -fsSL -o server.py https://raw.githubusercontent.com/你的用户名/file-upload-system/main/server.py
-curl -fsSL -o config.py https://raw.githubusercontent.com/你的用户名/file-upload-system/main/config.py
-curl -fsSL -o index.html https://raw.githubusercontent.com/你的用户名/file-upload-system/main/index.html
+echo "7. 下载服务文件..."
+curl -H 'Cache-Control: no-cache, no-store, must-revalidate' -s -o server.py "https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/server.py"
+curl -H 'Cache-Control: no-cache, no-store, must-revalidate' -s -o config.py "https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/config.py"
+curl -H 'Cache-Control: no-cache, no-store, must-revalidate' -s -o index.html "https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/index.html"
 
 echo "8. 生成配置文件..."
-cat > config_local.py <<EOF
+cat > config.py <<EOF
 PASSWORD = "$PASSWORD"
 PORT = $PORT
 UPLOAD_DIR = "/opt/file-upload-uuid/uploads"
 HOST = "0.0.0.0"
 EOF
-
-# 将本地配置导入 server.py（在文件开头插入 import）
-sed -i '1i from config_local import *' server.py
 
 echo "9. 创建 systemd 服务..."
 cat > /etc/systemd/system/file-upload-uuid.service <<EOF
@@ -79,8 +70,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo "10. 设置目录权限并启动服务..."
-chmod -R 755 /opt/file-upload-uuid
+echo "10. 启动服务..."
 systemctl daemon-reload
 systemctl enable file-upload-uuid
 systemctl start file-upload-uuid
@@ -92,9 +82,7 @@ if systemctl is-active --quiet file-upload-uuid; then
     echo "✅ UUID版本文件上传系统安装完成！"
     echo "访问地址: http://$IP:$PORT"
     echo "登录密码: $PASSWORD"
-    echo "项目目录: /opt/file-upload-uuid"
     echo "========================================"
 else
-    echo "❌ 服务启动失败，请查看日志: journalctl -u file-upload-uuid -n 30"
-    exit 1
+    echo "❌ 服务启动失败，请检查日志: journalctl -u file-upload-uuid -n 30"
 fi

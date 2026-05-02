@@ -1,146 +1,141 @@
 import os
+import sqlite3
+import shutil
 import time
-from flask import Flask, request, jsonify, send_from_directory, session
+import re
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from werkzeug.utils import secure_filename
-from functools import wraps
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # 请修改为随机字符串
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 配置
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'zip', 'rar', '7z', 'tar', 'gz', 'tar.gz'}
-MAX_CONTENT_LENGTH = 1 * 1024 * 1024 * 1024  # 1GB
+# 初始化数据库
+def init_db():
+    conn = sqlite3.connect('files.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS files
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  filename TEXT NOT NULL,
+                  size INTEGER NOT NULL,
+                  upload_time TEXT NOT NULL)''')
+    conn.commit()
+    conn.close()
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+init_db()
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# 访问密码（请修改）
-ACCESS_PASSWORD = 'your_password'
-
-
-def allowed_file(filename):
-    """检查文件扩展名是否允许"""
+def safe_filename(filename):
+    """
+    安全处理文件名，保留中文字符，并自动处理重名（添加下划线数字序号）。
+    规则：
+    - 如果文件已存在，则生成 "基础名_1.扩展名"、"基础名_2.扩展名" ...
+    - 注意处理 .tar.gz 这类双扩展名
+    """
+    # 分离基础名和扩展名（支持 .tar.gz）
     if filename.lower().endswith('.tar.gz'):
-        return True
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-@app.route('/check_auth', methods=['GET'])
-def check_auth():
-    return jsonify({'authenticated': session.get('authenticated', False)})
-
-
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    password = data.get('password', '')
-    if password == ACCESS_PASSWORD:
-        session['authenticated'] = True
-        return jsonify({'success': True, 'message': '验证成功'})
-    return jsonify({'success': False, 'message': '密码错误'}), 401
-
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    session.pop('authenticated', None)
-    return jsonify({'success': True})
-
-
-def safe_filename(original_name):
-    """
-    生成安全的文件名：保留原始文件名（安全化），重名时加数字后缀。
-    绝不产生 UUID。
-    """
-    # 安全化文件名（移除危险字符，保留中文等）
-    safe = secure_filename(original_name)
-    # 如果 secure_filename 返回空（例如原文件名全是非法字符），则使用时间戳
-    if not safe:
-        safe = f"file_{int(time.time())}"
-        print(f"警告: 原文件名 '{original_name}' 安全化后为空，使用 '{safe}'")
-    
-    # 分离基础名和扩展名（处理 .tar.gz）
-    if safe.lower().endswith('.tar.gz'):
-        base_name = safe[:-7]
-        extension = '.tar.gz'
+        base = filename[:-7]
+        ext = '.tar.gz'
     else:
-        base_name, extension = os.path.splitext(safe)
+        base, ext = os.path.splitext(filename)
     
-    # 重名处理
-    final_name = safe
+    # 清理基础名：去除路径分隔符等危险字符，保留中文、字母、数字、下划线、点、横线、空格
+    base = re.sub(r'[\\/*?:"<>|]', '', base)
+    base = base.strip()
+    if not base:
+        base = f"file_{int(time.time())}"
+    
+    # 生成最终文件名（先尝试不带数字）
+    final_name = base + ext
     counter = 1
     while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_name)):
-        final_name = f"{base_name}_{counter}{extension}"
+        # 存在冲突，加下划线数字
+        final_name = f"{base}_{counter}{ext}"
         counter += 1
-    
     return final_name
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
-@login_required
 def upload_file():
     if 'file' not in request.files:
-        return jsonify({'success': False, 'message': '没有文件部分'}), 400
+        return jsonify({'error': 'No file part'}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'success': False, 'message': '未选择文件'}), 400
-    if not allowed_file(file.filename):
-        return jsonify({'success': False, 'message': '不支持的文件类型'}), 400
+        return jsonify({'error': 'No selected file'}), 400
     
-    # 生成最终保存的文件名（保证可读，绝不使用 UUID）
-    final_filename = safe_filename(file.filename)
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
-    file.save(save_path)
+    # 生成安全且不重复的文件名
+    filename = safe_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
     
-    print(f"文件已保存: {final_filename} (原文件名: {file.filename})")
+    # 记录到数据库
+    size = os.path.getsize(filepath)
+    upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect('files.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO files (filename, size, upload_time) VALUES (?, ?, ?)",
+              (filename, size, upload_time))
+    conn.commit()
+    file_id = c.lastrowid
+    conn.close()
     
     return jsonify({
-        'success': True,
-        'message': '上传成功',
-        'uuid_filename': final_filename,   # 实际上就是原始文件名（可能带数字后缀）
-        'original_name': file.filename
+        'id': file_id,
+        'filename': filename,
+        'size': size,
+        'upload_time': upload_time
     })
 
-
 @app.route('/files', methods=['GET'])
-@login_required
 def list_files():
+    conn = sqlite3.connect('files.db')
+    c = conn.cursor()
+    c.execute("SELECT id, filename, size, upload_time FROM files ORDER BY upload_time DESC")
+    rows = c.fetchall()
+    conn.close()
     files = []
-    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.isfile(filepath):
-            stat = os.stat(filepath)
-            files.append({
-                'name': filename,
-                'filename': filename,
-                'size': stat.st_size,
-                'modified': stat.st_mtime,
-                'url': f'/download/{filename}'
-            })
-    # 按修改时间倒序
-    files.sort(key=lambda x: x['modified'], reverse=True)
-    return jsonify({'success': True, 'files': files})
+    for row in rows:
+        files.append({
+            'id': row[0],
+            'filename': row[1],
+            'size': row[2],
+            'upload_time': row[3]
+        })
+    return jsonify(files)
 
+@app.route('/delete/<int:file_id>', methods=['DELETE'])
+def delete_file(file_id):
+    conn = sqlite3.connect('files.db')
+    c = conn.cursor()
+    c.execute("SELECT filename FROM files WHERE id=?", (file_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'File not found'}), 404
+    filename = row[0]
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    c.execute("DELETE FROM files WHERE id=?", (file_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
-@app.route('/download/<path:filename>', methods=['GET'])
-@login_required
-def download_file(filename):
-    safe_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(filename))
-    if not os.path.exists(safe_path):
-        return jsonify({'error': '文件不存在'}), 404
-    return send_from_directory(app.config['UPLOAD_FOLDER'], os.path.basename(filename), as_attachment=True)
-
+@app.route('/download/<int:file_id>')
+def download_file(file_id):
+    conn = sqlite3.connect('files.db')
+    c = conn.cursor()
+    c.execute("SELECT filename FROM files WHERE id=?", (file_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return 'File not found', 404
+    filename = row[0]
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

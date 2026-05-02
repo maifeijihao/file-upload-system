@@ -231,6 +231,12 @@
             margin-top: 3px;
         }
         
+        .file-upload-time {
+            color: #4a90e2;
+            font-size: 11px;
+            margin-top: 3px;
+        }
+        
         .file-status {
             font-size: 12px;
             padding: 2px 6px;
@@ -621,6 +627,18 @@
             return '.' + ext;
         }
         
+        function formatUploadTime(timestamp) {
+            if (!timestamp) return '未知时间';
+            const date = new Date(timestamp * 1000);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+        
         // ==================== 认证相关 ====================
         async function checkAuth() {
             try {
@@ -698,6 +716,8 @@
                 if (!data.success) throw new Error(data.message);
                 
                 currentFiles = data.files || [];
+                // 对所有文件按上传时间倒序排序（最新的在前）
+                currentFiles.sort((a, b) => (b.upload_time || 0) - (a.upload_time || 0));
                 updateDisplay();
                 
             } catch (error) {
@@ -707,109 +727,138 @@
         }
         
         function updateDisplay() {
-            const filesToDisplay = currentViewMode === 'current' ? currentSessionFiles : currentFiles;
+            let filesToDisplay;
+            if (currentViewMode === 'current') {
+                // 对当前会话已上传的文件按时间倒序排序
+                const sortedSessionFiles = [...currentSessionFiles].sort((a, b) => (b.upload_time || 0) - (a.upload_time || 0));
+                filesToDisplay = sortedSessionFiles;
+            } else {
+                filesToDisplay = currentFiles;
+            }
             displayFiles(filesToDisplay);
         }
         
         function displayFiles(files) {
             if (!files || files.length === 0) {
-                showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
-                updateStats(0, 0, 0, 0);
+                if (currentViewMode === 'current' && activeUploads.size === 0 && failedUploads.length === 0) {
+                    showEmptyState('当前没有上传文件');
+                    updateStats(0, 0, 0, 0);
+                } else if (currentViewMode === 'all') {
+                    showEmptyState('暂无文件');
+                    updateStats(0, 0, 0, 0);
+                } else {
+                    // 当前视图但有上传中或失败的文件
+                    renderCurrentViewWithActiveAndFailed();
+                }
                 return;
             }
             
+            if (currentViewMode === 'current') {
+                // 当前视图需要同时显示上传中、成功、失败
+                renderCurrentViewWithActiveAndFailed(files);
+            } else {
+                // 所有视图只显示成功文件
+                let totalSize = 0;
+                let html = '';
+                files.forEach(file => {
+                    totalSize += file.size || 0;
+                    html += createFileItemHtml(
+                        file.filename,
+                        file.original_name || file.name || file.filename,
+                        file.size,
+                        'success',
+                        0,
+                        file.upload_time
+                    );
+                });
+                fileList.innerHTML = html;
+                updateStats(files.length, totalSize, files.length, 0);
+                
+                // 更新批量复制按钮状态
+                batchCopyCurrentBtn.disabled = true;
+                batchCopyAllBtn.disabled = currentFiles.length === 0;
+            }
+        }
+        
+        function renderCurrentViewWithActiveAndSortedSuccess(sortedSuccessFiles) {
             let totalSize = 0;
             let successCount = 0;
             let html = '';
             
-            // 显示当前上传的文件（包括上传中和已上传的）
-            if (currentViewMode === 'current') {
-                // 显示上传中的文件
-                activeUploads.forEach((upload, uploadId) => {
-                    const file = upload.file;
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        uploadId,
-                        file.name,
-                        file.size,
-                        'uploading',
-                        upload.progress || 0
-                    );
-                });
-                
-                // 显示当前会话已上传的文件
-                files.forEach(file => {
-                    if (!activeUploads.has(file.id)) {
-                        totalSize += file.size || 0;
-                        successCount++;
-                        
-                        const displayName = file.original_name || file.name || file.filename;
-                        const fileId = file.uuid || file.filename;
-                        
-                        html += createFileItemHtml(
-                            fileId,
-                            displayName,
-                            file.size,
-                            'success'
-                        );
-                    }
-                });
-                
-                // 显示失败的文件
-                failedUploads.forEach((file, index) => {
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        'failed-' + index,
-                        file.name,
-                        file.size,
-                        'failed'
-                    );
-                });
-            } else {
-                // 显示所有文件
-                files.forEach(file => {
+            // 1. 上传中的文件（保持原顺序，显示在最前面）
+            const uploadingItems = Array.from(activeUploads.entries());
+            uploadingItems.forEach(([uploadId, upload]) => {
+                const file = upload.file;
+                totalSize += file.size || 0;
+                html += createFileItemHtml(
+                    uploadId,
+                    file.name,
+                    file.size,
+                    'uploading',
+                    upload.progress || 0
+                );
+            });
+            
+            // 2. 已上传成功的文件（已按时间排序好的）
+            if (sortedSuccessFiles) {
+                sortedSuccessFiles.forEach(file => {
                     totalSize += file.size || 0;
                     successCount++;
-                    
                     const displayName = file.original_name || file.name || file.filename;
-                    const fileId = file.uuid || file.filename;
-                    
+                    const fileId = file.filename;
                     html += createFileItemHtml(
                         fileId,
                         displayName,
                         file.size,
-                        'success'
+                        'success',
+                        0,
+                        file.upload_time
                     );
                 });
             }
             
+            // 3. 失败的文件
+            failedUploads.forEach((file, index) => {
+                totalSize += file.size || 0;
+                html += createFileItemHtml(
+                    'failed-' + index,
+                    file.name,
+                    file.size,
+                    'failed',
+                    0
+                );
+            });
+            
+            if (html === '') {
+                showEmptyState('当前没有上传文件');
+                updateStats(0, 0, 0, 0);
+                return;
+            }
+            
             fileList.innerHTML = html;
-            
-            // 更新统计信息
-            const totalCount = currentViewMode === 'current' 
-                ? activeUploads.size + files.length + failedUploads.length
-                : files.length;
-            
-            const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
-            
-            updateStats(totalCount, totalSize, successCount, failedCount);
+            const totalCount = activeUploads.size + (sortedSuccessFiles ? sortedSuccessFiles.length : 0) + failedUploads.length;
+            updateStats(totalCount, totalSize, successCount, failedUploads.length);
             
             // 更新批量复制按钮状态
-            const hasFiles = currentViewMode === 'current' 
-                ? (activeUploads.size + files.length + failedUploads.length) > 0
-                : files.length > 0;
-                
-            const hasAllFiles = currentFiles.length > 0;
-            
+            const hasFiles = (sortedSuccessFiles && sortedSuccessFiles.length > 0) || activeUploads.size > 0 || failedUploads.length > 0;
             batchCopyCurrentBtn.disabled = !hasFiles;
-            batchCopyAllBtn.disabled = !hasAllFiles;
+            batchCopyAllBtn.disabled = currentFiles.length === 0;
         }
         
-        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
+        function renderCurrentViewWithActiveAndFailed(sortedSuccessFiles) {
+            // 如果没有传入 sortedSuccessFiles，则使用 currentSessionFiles 并排序
+            if (!sortedSuccessFiles) {
+                const sorted = [...currentSessionFiles].sort((a, b) => (b.upload_time || 0) - (a.upload_time || 0));
+                renderCurrentViewWithActiveAndSortedSuccess(sorted);
+            } else {
+                renderCurrentViewWithActiveAndSortedSuccess(sortedSuccessFiles);
+            }
+        }
+        
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0, uploadTime = null) {
             const fileExt = getFileExtension(fileName).toLowerCase();
             const fileSizeFormatted = formatFileSize(fileSize || 0);
+            const timeFormatted = uploadTime ? formatUploadTime(uploadTime) : '';
             
             // 状态文本
             let statusText = '';
@@ -826,7 +875,7 @@
                 statusText = '已上传';
                 statusClass = 'status-success';
                 actionButtons = `
-                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName}')">复制链接</button>
+                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName.replace(/'/g, "\\'")}')">复制链接</button>
                 `;
             } else if (status === 'failed') {
                 statusText = '上传失败';
@@ -841,19 +890,29 @@
                 </div>
             ` : '';
             
-            // 移除了图标部分
+            // 时间显示
+            const timeHtml = (status === 'success' && timeFormatted) ? `
+                <div class="file-upload-time">上传时间: ${timeFormatted}</div>
+            ` : '';
+            
+            // 文件ID显示（仅成功状态显示链接ID）
+            const uuidHtml = (status === 'success') ? `
+                <div class="file-uuid">
+                    文件ID: ${fileId.substring(0, 8)}...
+                </div>
+            ` : '';
+            
             return `
                 <div class="file-item" data-id="${fileId}">
                     <div class="file-info">
                         <div class="file-details">
-                            <div class="file-name" title="${fileName}">
+                            <div class="file-name" title="${fileName.replace(/'/g, "\\'")}">
                                 ${fileName}
                                 <span class="file-status ${statusClass}">${statusText}</span>
                             </div>
                             <div class="file-size">${fileSizeFormatted}</div>
-                            <div class="file-uuid">
-                                文件ID: ${fileId.substring(0, 8)}...
-                            </div>
+                            ${uuidHtml}
+                            ${timeHtml}
                             ${progressBar}
                         </div>
                     </div>
@@ -962,23 +1021,25 @@
                 
                 if (xhr.status === 200 && response.success) {
                     // 上传成功
-                    const fileId = response.uuid_filename || uploadId;
+                    const fileId = response.filename;
                     const fileData = {
                         id: fileId,
                         name: file.name,
                         original_name: file.name,
                         size: file.size,
-                        uuid: fileId,
-                        filename: fileId
+                        filename: fileId,
+                        upload_time: response.upload_time
                     };
                     
                     // 添加到当前会话文件列表
                     currentSessionFiles.push(fileData);
+                    // 重新排序当前会话文件
+                    currentSessionFiles.sort((a, b) => (b.upload_time || 0) - (a.upload_time || 0));
                     
                     // 从上传列表中移除
                     activeUploads.delete(uploadId);
                     
-                    // 重新加载所有文件
+                    // 重新加载所有文件（以获取完整列表和更新时间）
                     loadFiles();
                     
                 } else if (xhr.status === 401) {
@@ -1065,7 +1126,7 @@
             
             filesToCopy.forEach((file, index) => {
                 const displayName = file.original_name || file.name || file.filename;
-                const fileId = file.uuid || file.filename;
+                const fileId = file.filename;
                 const fileUrl = `${serverUrl}/download/${fileId}`;
                 allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
             });
@@ -1096,7 +1157,7 @@
             
             currentFiles.forEach((file, index) => {
                 const displayName = file.original_name || file.name || file.filename;
-                const fileId = file.uuid || file.filename;
+                const fileId = file.filename;
                 const fileUrl = `${serverUrl}/download/${fileId}`;
                 allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
             });

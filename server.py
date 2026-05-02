@@ -1,8 +1,7 @@
 import os
 import sqlite3
-import shutil
-import time
 import re
+import time
 from flask import Flask, request, jsonify, send_from_directory, render_template
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -28,29 +27,28 @@ init_db()
 
 def safe_filename(filename):
     """
-    安全处理文件名，保留中文字符，并自动处理重名（添加下划线数字序号）。
+    安全处理文件名，保留中文字符，并自动处理重名（加下划线数字）。
     规则：
     - 如果文件已存在，则生成 "基础名_1.扩展名"、"基础名_2.扩展名" ...
-    - 注意处理 .tar.gz 这类双扩展名
+    - 支持 .tar.gz 双扩展名
     """
-    # 分离基础名和扩展名（支持 .tar.gz）
+    # 分离基础名和扩展名
     if filename.lower().endswith('.tar.gz'):
         base = filename[:-7]
         ext = '.tar.gz'
     else:
         base, ext = os.path.splitext(filename)
     
-    # 清理基础名：去除路径分隔符等危险字符，保留中文、字母、数字、下划线、点、横线、空格
+    # 清理基础名（去除危险字符，保留中文、字母、数字、下划线、点、空格）
     base = re.sub(r'[\\/*?:"<>|]', '', base)
     base = base.strip()
     if not base:
         base = f"file_{int(time.time())}"
     
-    # 生成最终文件名（先尝试不带数字）
+    # 重名检测并添加 _数字 后缀
     final_name = base + ext
     counter = 1
     while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_name)):
-        # 存在冲突，加下划线数字
         final_name = f"{base}_{counter}{ext}"
         counter += 1
     return final_name
@@ -67,12 +65,10 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
     
-    # 生成安全且不重复的文件名
     filename = safe_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
     
-    # 记录到数据库
     size = os.path.getsize(filepath)
     upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn = sqlite3.connect('files.db')

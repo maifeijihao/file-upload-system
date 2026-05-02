@@ -23,6 +23,10 @@ sudo apt update && sudo apt install -y curl && curl -s -o /tmp/install.sh https:
 curl -fsSL https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/index.html -o /opt/file-upload-uuid/index.html && cd /opt/file-upload-uuid && sudo ./restart.sh
 ```
 
+### 第三步：绑定域名
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/setup-https.sh)"
+```
 
 
 

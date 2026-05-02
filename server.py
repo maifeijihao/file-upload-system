@@ -1,179 +1,146 @@
 cd /opt/upload
 cat > server.py << 'EOF'
-from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
-import socket
-from config import PASSWORD, START_PORT, find_available_port
+import uuid
+import shutil
+from datetime import datetime
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
+from werkzeug.utils import secure_filename
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+app.secret_key = 'your-secret-key-here'  # 请替换为随机字符串，建议从环境变量读取
+
+# 配置
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'zip', 'rar', '7z', 'tar', 'gz', 'tar.gz'}
+MAX_CONTENT_LENGTH = 1 * 1024 * 1024 * 1024  # 1GB
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 # 确保上传目录存在
-os.makedirs('uploads', exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def check_login():
-    """检查是否已登录"""
-    return session.get('logged_in', False)
+# 密码验证（请修改为你自己的密码）
+ACCESS_PASSWORD = 'your_password'  # 请替换为实际密码
 
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
+
+def allowed_file(filename):
+    """检查文件扩展名是否允许"""
+    # 处理.tar.gz特殊情况
+    if filename.lower().endswith('.tar.gz'):
+        return True
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def login_required(f):
+    """登录验证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/check_auth', methods=['GET'])
+def check_auth():
+    """检查认证状态"""
+    return jsonify({'authenticated': session.get('authenticated', False)})
+
 
 @app.route('/login', methods=['POST'])
 def login():
     """登录验证"""
-    try:
-        data = request.get_json()
-        if not data or 'password' not in data:
-            return jsonify({'success': False, 'message': '密码不能为空'}), 400
-        
-        if data['password'] == PASSWORD:
-            session['logged_in'] = True
-            return jsonify({'success': True, 'message': '登录成功'}), 200
-        else:
-            return jsonify({'success': False, 'message': '密码错误'}), 401
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'登录失败: {str(e)}'}), 500
+    data = request.get_json()
+    password = data.get('password', '')
+    if password == ACCESS_PASSWORD:
+        session['authenticated'] = True
+        return jsonify({'success': True, 'message': '验证成功'})
+    else:
+        return jsonify({'success': False, 'message': '密码错误'}), 401
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    """退出登录"""
-    try:
-        session.clear()
-        return jsonify({'success': True, 'message': '退出成功'}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'退出失败: {str(e)}'}), 500
+    """登出"""
+    session.pop('authenticated', None)
+    return jsonify({'success': True})
 
-@app.route('/check_auth', methods=['GET'])
-def check_auth():
-    """检查登录状态"""
-    try:
-        if check_login():
-            return jsonify({'authenticated': True}), 200
-        else:
-            return jsonify({'authenticated': False}), 200
-    except Exception as e:
-        return jsonify({'authenticated': False, 'error': str(e)}), 200
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
-    """上传文件"""
-    # 检查登录状态
-    if not check_login():
-        return jsonify({'success': False, 'message': '请先登录'}), 401
-    
-    # 检查是否有文件
+    """上传文件（修改了文件命名逻辑，不再使用 UUID）"""
     if 'file' not in request.files:
-        return jsonify({'success': False, 'message': '没有选择文件'}), 400
+        return jsonify({'success': False, 'message': '没有文件部分'}), 400
     
     file = request.files['file']
-    
-    # 检查文件名
     if file.filename == '':
-        return jsonify({'success': False, 'message': '没有选择文件'}), 400
+        return jsonify({'success': False, 'message': '未选择文件'}), 400
     
-    # 检查文件类型
-    allowed_extensions = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz']
-    filename = file.filename
-    file_ext = os.path.splitext(filename)[1].lower()
+    if not allowed_file(file.filename):
+        return jsonify({'success': False, 'message': '不支持的文件类型'}), 400
     
-    # 处理.tar.gz扩展名
-    if file_ext == '.gz' and filename.lower().endswith('.tar.gz'):
-        file_ext = '.tar.gz'
+    # 获取安全化的原始文件名
+    original_filename = secure_filename(file.filename)
+    # 分离基础名和扩展名（处理 .tar.gz）
+    if original_filename.lower().endswith('.tar.gz'):
+        base_name = original_filename[:-7]
+        extension = '.tar.gz'
+    else:
+        base_name, extension = os.path.splitext(original_filename)
     
-    if file_ext not in allowed_extensions:
-        return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
+    # 处理重名：如果文件已存在，添加 _1, _2, ... 后缀
+    final_filename = original_filename
+    counter = 1
+    while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_filename)):
+        final_filename = f"{base_name}_{counter}{extension}"
+        counter += 1
     
-    try:
-        # 确保文件名唯一
-        base_name, extension = os.path.splitext(filename)
-        counter = 1
-        original_filename = filename
-        
-        while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
-            filename = f"{base_name}_{counter}{extension}"
-            counter += 1
-        
-        # 保存文件
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        
-        # 获取文件信息
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file_size = os.path.getsize(file_path)
-        
-        return jsonify({
-            'success': True, 
-            'message': '上传成功', 
-            'filename': filename,
-            'original_name': original_filename,
-            'size': file_size,
-            'url': f'/download/{filename}'
-        }), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
+    # 保存文件（最终文件名是原始名或带数字后缀，不再使用 UUID）
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], final_filename))
+    
+    return jsonify({
+        'success': True,
+        'message': '上传成功',
+        'uuid_filename': final_filename,   # 这里实际是可读的文件名
+        'original_name': original_filename
+    })
+
 
 @app.route('/files', methods=['GET'])
+@login_required
 def list_files():
-    """获取文件列表"""
-    # 检查登录状态
-    if not check_login():
-        return jsonify({'success': False, 'message': '请先登录'}), 401
-    
-    try:
-        files = []
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            
-            if os.path.isfile(file_path):
-                file_size = os.path.getsize(file_path)
-                files.append({
-                    'name': filename,
-                    'filename': filename,
-                    'size': file_size,
-                    'url': f'/download/{filename}'
-                })
-        
-        return jsonify({'success': True, 'files': files}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取文件列表失败: {str(e)}'}), 500
+    """获取所有已上传文件列表"""
+    files = []
+    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.isfile(filepath):
+            stat = os.stat(filepath)
+            files.append({
+                'name': filename,
+                'filename': filename,
+                'size': stat.st_size,
+                'modified': stat.st_mtime,
+                'url': f'/download/{filename}'
+            })
+    # 按修改时间倒序排列（最新在上）
+    files.sort(key=lambda x: x['modified'], reverse=True)
+    return jsonify({'success': True, 'files': files})
 
-@app.route('/download/<filename>')
+
+@app.route('/download/<path:filename>', methods=['GET'])
+@login_required
 def download_file(filename):
     """下载文件"""
-    try:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        if not os.path.exists(file_path):
-            return jsonify({'success': False, 'message': '文件不存在'}), 404
-        
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=filename
-        )
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'下载失败: {str(e)}'}), 500
+    # 防止路径穿越攻击
+    safe_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(filename))
+    if not os.path.exists(safe_path):
+        return jsonify({'error': '文件不存在'}), 404
+    return send_from_directory(app.config['UPLOAD_FOLDER'], os.path.basename(filename), as_attachment=True)
+
 
 if __name__ == '__main__':
-    # 寻找可用端口
-    port = find_available_port(START_PORT)
-    
-    if port is None:
-        print(f"错误：从端口{START_PORT}开始，没有找到可用端口！")
-        exit(1)
-    
-    if port != START_PORT:
-        print(f"端口{START_PORT}被占用，使用端口{port}")
-    
-    print("=" * 50)
-    print("文件上传系统启动成功！")
-    print(f"访问地址: http://0.0.0.0:{port}")
-    print(f"上传目录: {os.path.abspath(app.config['UPLOAD_FOLDER'])}")
-    print("支持格式: .zip .rar .7z .tar .gz .tar.gz")
-    print("最大大小: 1GB")
-    print("=" * 50)
-    
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
-EOF
+    app.run(host='0.0.0.0', port=8080, debug=True)

@@ -672,7 +672,8 @@
                     });
                 }
                 for (let file of currentSessionFiles) {
-                    const displayName = file.original_name || file.name || file.filename;
+                    // 【修改点1】显示服务器最终文件名，优先使用 server_filename，否则回退到原始名
+                    const displayName = file.server_filename || file.original_name || file.name || file.filename;
                     items.push({
                         type: 'success',
                         id: file.uuid || file.filename,
@@ -736,7 +737,8 @@
                 for (let file of sortedFiles) {
                     totalSize += file.size || 0;
                     successCount++;
-                    const displayName = file.original_name || file.name || file.filename;
+                    // 【修改点2】全部文件列表中也显示服务器最终文件名
+                    const displayName = file.server_filename || file.original_name || file.name || file.filename;
                     const fileId = file.uuid || file.filename;
                     html += createFileItemHtml(fileId, displayName, file.size, 'success', 0, null, file._displayTime);
                 }
@@ -859,10 +861,12 @@
                     const fileId = response.uuid_filename || uploadId;
                     const stableTime = Date.now();
                     getStableFileTime(fileId, stableTime);
+                    // 【修改点3】保存服务器返回的真实文件名到 server_filename
                     const fileData = {
                         id: fileId,
                         name: file.name,
                         original_name: file.name,
+                        server_filename: response.filename,   // 新增：服务器端实际存储的文件名
                         size: file.size,
                         uuid: fileId,
                         filename: fileId,
@@ -934,7 +938,7 @@
             const serverUrl = window.location.origin;
             let allLinks = '';
             filesToCopy.forEach((file, index) => {
-                const displayName = file.original_name || file.name || file.filename;
+                const displayName = file.server_filename || file.original_name || file.name || file.filename;
                 const fileId = file.uuid || file.filename;
                 allLinks += `${index + 1}. ${displayName}\n${serverUrl}/download/${fileId}\n\n`;
             });
@@ -960,7 +964,7 @@
             const serverUrl = window.location.origin;
             let allLinks = '';
             currentFiles.forEach((file, index) => {
-                const displayName = file.original_name || file.name || file.filename;
+                const displayName = file.server_filename || file.original_name || file.name || file.filename;
                 const fileId = file.uuid || file.filename;
                 allLinks += `${index + 1}. ${displayName}\n${serverUrl}/download/${fileId}\n\n`;
             });

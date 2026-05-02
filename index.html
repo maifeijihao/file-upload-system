@@ -603,7 +603,7 @@
         let activeUploads = new Map();
         let failedUploads = [];
         let currentFiles = []; // 从服务器获取的所有文件
-        let currentSessionFiles = []; // 当前会话上传的文件
+        let currentSessionFiles = []; // 当前会话上传的文件 (每个对象增加 uploadTime 字段)
         let currentViewMode = 'current'; // 'current' 或 'all'
         
         // ==================== 工具函数 ====================
@@ -697,7 +697,15 @@
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message);
                 
-                currentFiles = data.files || [];
+                // 为每个服务器文件补充一个用于排序的时间戳（如果服务器未提供，用当前时间作为后备，保证顺序）
+                currentFiles = (data.files || []).map(file => {
+                    if (!file.uploadTime && !file.upload_time && !file.created_at) {
+                        // 若无时间字段，则给一个默认值（0或者当前时间？为了新文件在上，旧文件在下，我们按上传顺序大致分）
+                        // 为了排序稳定性，使用当前时间作为后备，让旧文件也能显示但顺序可能不完美，但不影响功能。
+                        file.uploadTime = Date.now();
+                    }
+                    return file;
+                });
                 updateDisplay();
                 
             } catch (error) {
@@ -706,11 +714,80 @@
             }
         }
         
-        function updateDisplay() {
-            const filesToDisplay = currentViewMode === 'current' ? currentSessionFiles : currentFiles;
-            displayFiles(filesToDisplay);
+        // 核心修改：按时间倒序排序（新文件在上面）
+        function sortFilesByTimeDesc(files) {
+            return [...files].sort((a, b) => {
+                // 获取时间戳：优先使用 uploadTime / upload_time / created_at / successTime (用于会话文件)
+                const timeA = a.uploadTime || a.upload_time || a.created_at || a.successTime || 0;
+                const timeB = b.uploadTime || b.upload_time || b.created_at || b.successTime || 0;
+                return timeB - timeA; // 降序，新的在前
+            });
         }
         
+        function updateDisplay() {
+            let filesToDisplay = [];
+            if (currentViewMode === 'current') {
+                // 当前视图: 由 activeUploads(上传中) + currentSessionFiles(会话成功) + failedUploads 组成，但 failedUploads 无时间字段
+                // 为了排序合理，我们将上传中文件、会话成功文件、失败文件混合后按时间排序，其中上传中文件的开始时间为 startTime
+                const combined = [];
+                
+                // 添加上传中的文件 (从 activeUploads 提取)
+                for (let [uploadId, upload] of activeUploads.entries()) {
+                    combined.push({
+                        id: uploadId,
+                        type: 'uploading',
+                        name: upload.file.name,
+                        size: upload.file.size,
+                        status: 'uploading',
+                        progress: upload.progress || 0,
+                        startTime: upload.startTime || Date.now(),
+                        original_name: upload.file.name,
+                        // 用于排序的时间字段
+                        sortTime: upload.startTime || Date.now()
+                    });
+                }
+                
+                // 添加会话成功文件 (已附加 uploadTime)
+                for (let file of currentSessionFiles) {
+                    combined.push({
+                        ...file,
+                        type: 'success',
+                        status: 'success',
+                        sortTime: file.uploadTime || file.successTime || 0
+                    });
+                }
+                
+                // 添加失败文件 (记录失败时间)
+                for (let fail of failedUploads) {
+                    combined.push({
+                        ...fail,
+                        type: 'failed',
+                        status: 'failed',
+                        sortTime: fail.failedTime || Date.now()
+                    });
+                }
+                
+                // 按 sortTime 降序排序
+                const sortedCombined = combined.sort((a,b) => (b.sortTime || 0) - (a.sortTime || 0));
+                // 调用专门针对混合列表的渲染
+                displayMixedList(sortedCombined);
+                // 更新统计数据 (需要重新计算)
+                let totalSize = 0, successCnt = 0, failedCnt = 0;
+                for (let item of sortedCombined) {
+                    totalSize += (item.size || 0);
+                    if (item.status === 'success') successCnt++;
+                    if (item.status === 'failed') failedCnt++;
+                }
+                updateStats(sortedCombined.length, totalSize, successCnt, failedCnt);
+                return;
+            } else {
+                // 所有文件视图：对服务器文件按时间排序
+                filesToDisplay = sortFilesByTimeDesc(currentFiles);
+                displayFiles(filesToDisplay);
+            }
+        }
+        
+        // 原有 displayFiles 仅用于展示纯文件列表（所有文件视图），保持不变但内部对 files 排序
         function displayFiles(files) {
             if (!files || files.length === 0) {
                 showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
@@ -722,96 +799,121 @@
             let successCount = 0;
             let html = '';
             
-            // 显示当前上传的文件（包括上传中和已上传的）
-            if (currentViewMode === 'current') {
-                // 显示上传中的文件
-                activeUploads.forEach((upload, uploadId) => {
-                    const file = upload.file;
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        uploadId,
-                        file.name,
-                        file.size,
-                        'uploading',
-                        upload.progress || 0
-                    );
-                });
-                
-                // 显示当前会话已上传的文件
-                files.forEach(file => {
-                    if (!activeUploads.has(file.id)) {
-                        totalSize += file.size || 0;
-                        successCount++;
-                        
-                        const displayName = file.original_name || file.name || file.filename;
-                        const fileId = file.uuid || file.filename;
-                        
-                        html += createFileItemHtml(
-                            fileId,
-                            displayName,
-                            file.size,
-                            'success'
-                        );
-                    }
-                });
-                
-                // 显示失败的文件
-                failedUploads.forEach((file, index) => {
-                    totalSize += file.size || 0;
-                    
-                    html += createFileItemHtml(
-                        'failed-' + index,
-                        file.name,
-                        file.size,
-                        'failed'
-                    );
-                });
-            } else {
-                // 显示所有文件
-                files.forEach(file => {
-                    totalSize += file.size || 0;
-                    successCount++;
-                    
-                    const displayName = file.original_name || file.name || file.filename;
-                    const fileId = file.uuid || file.filename;
-                    
-                    html += createFileItemHtml(
-                        fileId,
-                        displayName,
-                        file.size,
-                        'success'
-                    );
-                });
+            for (let file of files) {
+                totalSize += file.size || 0;
+                successCount++;
+                const displayName = file.original_name || file.name || file.filename;
+                const fileId = file.uuid || file.filename;
+                html += createFileItemHtml(
+                    fileId,
+                    displayName,
+                    file.size,
+                    'success'
+                );
             }
             
             fileList.innerHTML = html;
-            
-            // 更新统计信息
-            const totalCount = currentViewMode === 'current' 
-                ? activeUploads.size + files.length + failedUploads.length
-                : files.length;
-            
-            const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
-            
-            updateStats(totalCount, totalSize, successCount, failedCount);
+            updateStats(files.length, totalSize, successCount, 0);
             
             // 更新批量复制按钮状态
-            const hasFiles = currentViewMode === 'current' 
-                ? (activeUploads.size + files.length + failedUploads.length) > 0
-                : files.length > 0;
-                
             const hasAllFiles = currentFiles.length > 0;
-            
-            batchCopyCurrentBtn.disabled = !hasFiles;
             batchCopyAllBtn.disabled = !hasAllFiles;
+            batchCopyCurrentBtn.disabled = (currentSessionFiles.length === 0);
+        }
+        
+        // 新函数：用于渲染当前视图（混合上传中、成功、失败），按时间排序
+        function displayMixedList(items) {
+            if (!items || items.length === 0) {
+                showEmptyState('当前没有上传文件');
+                updateStats(0, 0, 0, 0);
+                return;
+            }
+            
+            let totalSize = 0;
+            let successCount = 0;
+            let failedCount = 0;
+            let html = '';
+            
+            for (let item of items) {
+                totalSize += item.size || 0;
+                if (item.status === 'success') successCount++;
+                if (item.status === 'failed') failedCount++;
+                
+                const displayName = item.original_name || item.name;
+                const fileSizeFormatted = formatFileSize(item.size || 0);
+                const fileId = item.uuid || item.id || ('temp_' + Math.random());
+                
+                if (item.status === 'uploading') {
+                    html += `
+                        <div class="file-item" data-id="${item.id}">
+                            <div class="file-info">
+                                <div class="file-details">
+                                    <div class="file-name" title="${escapeHtml(displayName)}">
+                                        ${escapeHtml(displayName)}
+                                        <span class="file-status status-uploading">上传中</span>
+                                    </div>
+                                    <div class="file-size">${fileSizeFormatted}</div>
+                                    <div class="progress-container" style="display: block;">
+                                        <div class="progress-bar" style="width: ${item.progress}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="cancel-btn" onclick="cancelUpload('${item.id}')">取消</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (item.status === 'success') {
+                    html += `
+                        <div class="file-item" data-id="${fileId}">
+                            <div class="file-info">
+                                <div class="file-details">
+                                    <div class="file-name" title="${escapeHtml(displayName)}">
+                                        ${escapeHtml(displayName)}
+                                        <span class="file-status status-success">已上传</span>
+                                    </div>
+                                    <div class="file-size">${fileSizeFormatted}</div>
+                                    <div class="file-uuid">
+                                        文件ID: ${fileId.substring(0, 8)}...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="copy-btn" onclick="copyLink('${fileId}', '${escapeHtml(displayName)}')">复制链接</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (item.status === 'failed') {
+                    html += `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <div class="file-details">
+                                    <div class="file-name" title="${escapeHtml(displayName)}">
+                                        ${escapeHtml(displayName)}
+                                        <span class="file-status status-failed">上传失败</span>
+                                    </div>
+                                    <div class="file-size">${fileSizeFormatted}</div>
+                                    <div class="file-uuid" style="color:#e74c3c;">${item.error || '上传失败'}</div>
+                                </div>
+                            </div>
+                            <div class="file-actions"></div>
+                        </div>
+                    `;
+                }
+            }
+            
+            fileList.innerHTML = html;
+            updateStats(items.length, totalSize, successCount, failedCount);
+            
+            // 更新批量复制当前按钮状态
+            batchCopyCurrentBtn.disabled = (currentSessionFiles.length === 0);
+            batchCopyAllBtn.disabled = (currentFiles.length === 0);
         }
         
         function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
             const fileExt = getFileExtension(fileName).toLowerCase();
             const fileSizeFormatted = formatFileSize(fileSize || 0);
             
-            // 状态文本
             let statusText = '';
             let statusClass = '';
             let actionButtons = '';
@@ -834,14 +936,12 @@
                 actionButtons = '';
             }
             
-            // 进度条
             const progressBar = status === 'uploading' ? `
                 <div class="progress-container" style="display: block;">
                     <div class="progress-bar" style="width: ${progress}%"></div>
                 </div>
             ` : '';
             
-            // 移除了图标部分
             return `
                 <div class="file-item" data-id="${fileId}">
                     <div class="file-info">
@@ -889,7 +989,7 @@
             
             if (!allowedExts.includes(fileExt)) {
                 alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件 (ZIP, RAR, 7Z, TAR, GZ)`);
-                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size });
+                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size, failedTime: Date.now() });
                 updateDisplay();
                 return;
             }
@@ -897,7 +997,7 @@
             // 验证文件大小 (1GB)
             if (file.size > 1024 * 1024 * 1024) {
                 alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
-                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size });
+                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size, failedTime: Date.now() });
                 updateDisplay();
                 return;
             }
@@ -905,11 +1005,12 @@
             // 创建上传项目
             const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             
-            // 存储上传信息
+            // 存储上传信息 (记录开始时间用于排序)
             activeUploads.set(uploadId, { 
                 file: file, 
                 progress: 0,
-                id: uploadId
+                id: uploadId,
+                startTime: Date.now()
             });
             
             // 更新显示
@@ -961,7 +1062,7 @@
                 const response = JSON.parse(xhr.responseText);
                 
                 if (xhr.status === 200 && response.success) {
-                    // 上传成功
+                    // 上传成功，添加时间戳用于排序 (新文件在上)
                     const fileId = response.uuid_filename || uploadId;
                     const fileData = {
                         id: fileId,
@@ -969,7 +1070,9 @@
                         original_name: file.name,
                         size: file.size,
                         uuid: fileId,
-                        filename: fileId
+                        filename: fileId,
+                        uploadTime: Date.now(),      // 关键: 记录成功时间
+                        successTime: Date.now()
                     };
                     
                     // 添加到当前会话文件列表
@@ -978,15 +1081,13 @@
                     // 从上传列表中移除
                     activeUploads.delete(uploadId);
                     
-                    // 重新加载所有文件
+                    // 重新加载所有文件 (同时刷新服务器列表)
                     loadFiles();
                     
                 } else if (xhr.status === 401) {
-                    // 未授权
                     handleUploadError(uploadId, file, '会话过期，请重新登录');
                     updateAuthStatus();
                 } else {
-                    // 其他错误
                     const errorMsg = response.message || '上传失败';
                     handleUploadError(uploadId, file, errorMsg);
                 }
@@ -999,11 +1100,12 @@
             const upload = activeUploads.get(uploadId);
             if (!upload) return;
             
-            // 添加到失败列表
+            // 添加到失败列表 (附带失败时间)
             failedUploads.push({ 
                 name: file.name, 
                 error: error,
-                size: file.size
+                size: file.size,
+                failedTime: Date.now()
             });
             
             // 从上传列表中移除
@@ -1044,12 +1146,11 @@
             }
         };
         
-        // ==================== 批量复制功能 ====================
+        // ==================== 批量复制功能 (保持不变) ====================
         async function batchCopyCurrent() {
             if (currentViewMode !== 'current') {
                 // 切换到当前视图
                 switchView('current');
-                // 等待视图更新
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             
@@ -1074,7 +1175,6 @@
                 await navigator.clipboard.writeText(allLinks);
                 alert(`✅ 已复制 ${filesToCopy.length} 个当前文件的链接到剪贴板！`);
             } catch (err) {
-                // 备用方法
                 const textarea = document.createElement('textarea');
                 textarea.value = allLinks;
                 document.body.appendChild(textarea);
@@ -1105,7 +1205,6 @@
                 await navigator.clipboard.writeText(allLinks);
                 alert(`✅ 已复制 ${currentFiles.length} 个所有文件的链接到剪贴板！`);
             } catch (err) {
-                // 备用方法
                 const textarea = document.createElement('textarea');
                 textarea.value = allLinks;
                 document.body.appendChild(textarea);
@@ -1134,7 +1233,6 @@
         }
         
         // ==================== 事件监听 ====================
-        // 密码验证
         passwordSubmitBtn.addEventListener('click', async () => {
             const password = passwordInput.value.trim();
             if (!password) {
@@ -1163,13 +1261,11 @@
             }
         });
         
-        // 退出登录
         logoutBtn.addEventListener('click', async () => {
             await logout();
             await updateAuthStatus();
         });
         
-        // 选择文件
         selectFileBtn.addEventListener('click', () => {
             if (!isAuthenticated) {
                 alert('请先通过密码验证');
@@ -1191,10 +1287,9 @@
                 uploadFile(file);
             });
             
-            fileInput.value = ''; // 清除选择，允许选择相同文件
+            fileInput.value = '';
         });
         
-        // 拖放上传
         uploadBox.addEventListener('dragover', (e) => {
             if (!isAuthenticated) {
                 e.preventDefault();
@@ -1225,21 +1320,14 @@
             });
         });
         
-        // 批量复制当前
         batchCopyCurrentBtn.addEventListener('click', batchCopyCurrent);
-        
-        // 批量复制所有
         batchCopyAllBtn.addEventListener('click', batchCopyAll);
-        
-        // 视图切换
         currentViewBtn.addEventListener('click', () => switchView('current'));
         allViewBtn.addEventListener('click', () => switchView('all'));
         
         // ==================== 初始化 ====================
         async function init() {
             await updateAuthStatus();
-            
-            // 每30秒刷新文件列表
             setInterval(async () => {
                 if (isAuthenticated && currentViewMode === 'all') {
                     await loadFiles();
@@ -1247,7 +1335,16 @@
             }, 30000);
         }
         
-        // 页面加载完成后初始化
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+        
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>

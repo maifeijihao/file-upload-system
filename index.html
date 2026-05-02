@@ -224,12 +224,19 @@
         .file-size {
             color: #666;
             font-size: 14px;
+            margin-bottom: 3px;
         }
         
         .file-uuid {
             color: #999;
             font-size: 11px;
-            margin-top: 3px;
+            margin-top: 2px;
+        }
+        
+        .file-time {
+            color: #888;
+            font-size: 10px;
+            margin-top: 2px;
         }
         
         .file-status {
@@ -609,7 +616,20 @@
             return '.' + ext;
         }
         
-        // ★★★ 为文件获取稳定的时间戳（基于 localStorage） ★★★
+        // 格式化时间戳为可读字符串
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+        
+        // 为文件获取稳定的时间戳（基于 localStorage）
         function getStableFileTime(fileId, currentTime = null) {
             const key = `file_time_${fileId}`;
             let stored = localStorage.getItem(key);
@@ -776,7 +796,7 @@
                     if (item.type === 'uploading') {
                         html += createFileItemHtml(item.id, item.fileName, item.fileSize, 'uploading', item.progress, item.uploadId);
                     } else if (item.type === 'success') {
-                        html += createFileItemHtml(item.id, item.fileName, item.fileSize, 'success');
+                        html += createFileItemHtml(item.id, item.fileName, item.fileSize, 'success', 0, null, item.displayTime);
                     } else {
                         html += createFileItemHtml(item.id, item.fileName, item.fileSize, 'failed');
                     }
@@ -805,7 +825,7 @@
                     successCount++;
                     const displayName = file.original_name || file.name || file.filename;
                     const fileId = file.uuid || file.filename;
-                    html += createFileItemHtml(fileId, displayName, file.size, 'success');
+                    html += createFileItemHtml(fileId, displayName, file.size, 'success', 0, null, file._displayTime);
                 }
                 fileList.innerHTML = html;
                 updateStats(sortedFiles.length, totalSize, successCount, 0);
@@ -820,7 +840,8 @@
             batchCopyAllBtn.disabled = !hasAllFiles;
         }
         
-        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0, uploadId = null) {
+        // 修改：增加 displayTime 参数，用于显示时间；文件ID显示12位
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0, uploadId = null, displayTime = null) {
             const fileSizeFormatted = formatFileSize(fileSize || 0);
             let statusText = '', statusClass = '', actionButtons = '';
             
@@ -844,6 +865,11 @@
                 </div>
             ` : '';
             
+            // 显示文件ID（取前12位）和时间（仅成功状态且有值）
+            const shortId = fileId ? fileId.substring(0, 12) : '未知';
+            const timeHtml = (status === 'success' && displayTime) ? 
+                `<div class="file-time">上传时间: ${formatTimestamp(displayTime)}</div>` : '';
+            
             return `
                 <div class="file-item" data-id="${fileId}">
                     <div class="file-info">
@@ -853,7 +879,8 @@
                                 <span class="file-status ${statusClass}">${statusText}</span>
                             </div>
                             <div class="file-size">${fileSizeFormatted}</div>
-                            <div class="file-uuid">文件ID: ${fileId.substring(0, 8)}...</div>
+                            <div class="file-uuid">文件ID: ${shortId}...</div>
+                            ${timeHtml}
                             ${progressBar}
                         </div>
                     </div>

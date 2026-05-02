@@ -9,13 +9,12 @@ from datetime import datetime
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # 用于 session
+app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 简单密码验证（请修改为您自己的密码）
-ADMIN_PASSWORD = 'admin123'  # 建议改为强密码
+ADMIN_PASSWORD = 'admin123'  # 请修改
 
 def init_db():
     conn = sqlite3.connect('files.db')
@@ -42,20 +41,15 @@ def login_required(f):
 
 def safe_filename(original_name):
     """生成安全的文件名，重名时自动添加 _数字"""
-    # 分离基础名和扩展名
     if original_name.lower().endswith('.tar.gz'):
         base = original_name[:-7]
         ext = '.tar.gz'
     else:
         base, ext = os.path.splitext(original_name)
-    
-    # 清理基础名（去除危险字符，保留中文、字母、数字、点、空格、下划线）
     base = re.sub(r'[\\/*?:"<>|]', '', base)
     base = base.strip()
     if not base:
         base = f"file_{int(time.time())}"
-    
-    # 重名检测：生成 base.ext，如果存在则 base_1.ext，base_2.ext ...
     final_name = base + ext
     counter = 1
     while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_name)):
@@ -94,12 +88,10 @@ def upload_file():
     if file.filename == '':
         return jsonify({'success': False, 'message': '文件名为空'}), 400
     
-    # 生成服务器存储的文件名（带重名处理）
     server_filename = safe_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], server_filename)
     file.save(filepath)
     
-    # 生成唯一 UUID（用于下载链接）
     file_uuid = str(uuid.uuid4())
     size = os.path.getsize(filepath)
     upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -114,7 +106,7 @@ def upload_file():
     return jsonify({
         'success': True,
         'uuid_filename': file_uuid,
-        'filename': server_filename,      # 服务器实际存储的文件名
+        'filename': server_filename,
         'original_name': file.filename,
         'size': size,
         'upload_time': upload_time

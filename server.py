@@ -4,7 +4,6 @@ import re
 import time
 import uuid
 from flask import Flask, request, jsonify, send_from_directory, render_template, session
-from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 
@@ -14,7 +13,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-ADMIN_PASSWORD = 'admin123'  # 请修改
+ADMIN_PASSWORD = 'admin123'  # 可修改
 
 def init_db():
     conn = sqlite3.connect('files.db')
@@ -33,14 +32,13 @@ init_db()
 
 def login_required(f):
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated(*args, **kwargs):
         if not session.get('authenticated'):
             return jsonify({'success': False, 'message': '未授权'}), 401
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 def safe_filename(original_name):
-    """生成安全的文件名，重名时自动添加 _数字"""
     if original_name.lower().endswith('.tar.gz'):
         base = original_name[:-7]
         ext = '.tar.gz'
@@ -68,8 +66,7 @@ def check_auth():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    password = data.get('password', '')
-    if password == ADMIN_PASSWORD:
+    if data.get('password') == ADMIN_PASSWORD:
         session['authenticated'] = True
         return jsonify({'success': True})
     return jsonify({'success': False, 'message': '密码错误'})
@@ -103,6 +100,9 @@ def upload_file():
     conn.commit()
     conn.close()
     
+    # 调试输出到控制台
+    print(f"[UPLOAD] {file.filename} -> {server_filename} (uuid: {file_uuid})")
+    
     return jsonify({
         'success': True,
         'uuid_filename': file_uuid,
@@ -129,6 +129,8 @@ def list_files():
             'size': row[3],
             'upload_time': row[4]
         })
+    # 调试输出到控制台
+    print(f"[FILES] 第一个文件: {files[0] if files else '无'}")
     return jsonify({'success': True, 'files': files})
 
 @app.route('/download/<uuid>')
@@ -141,8 +143,7 @@ def download_file(uuid):
     conn.close()
     if not row:
         return '文件不存在', 404
-    filename = row[0]
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], row[0], as_attachment=True)
 
 @app.route('/delete/<uuid>', methods=['DELETE'])
 @login_required
@@ -154,8 +155,7 @@ def delete_file(uuid):
     if not row:
         conn.close()
         return jsonify({'success': False, 'message': '文件不存在'}), 404
-    filename = row[0]
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], row[0])
     if os.path.exists(filepath):
         os.remove(filepath)
     c.execute("DELETE FROM files WHERE uuid=?", (uuid,))
@@ -164,4 +164,4 @@ def delete_file(uuid):
     return jsonify({'success': True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)   # 注意这里 debug=True 以便看到打印

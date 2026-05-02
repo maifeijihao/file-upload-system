@@ -15,30 +15,12 @@
 
 ### 第一步：安装系统
 ```bash
-TOKEN="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"
-curl -H "Authorization: token $TOKEN" \
-     -H "Accept: application/vnd.github.v3.raw" \
-     -H "Cache-Control: no-cache, no-store, must-revalidate" \
-     -H "Pragma: no-cache" \
-     -H "Expires: 0" \
-     -s "https://api.github.com/repos/maifeijihao/file-upload-system/contents/upload-install.sh" \
-     -o /tmp/file-upload-install.sh
-
-sudo bash /tmp/file-upload-install.sh
+curl -s -o /tmp/file-upload-install.sh https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/upload-install.sh && sudo bash /tmp/file-upload-install.sh
 ```
 
 ### 第二步：更新文件并重启
 ```bash
-TOKEN="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"
-curl -H "Authorization: token $TOKEN" \
-     -H "Accept: application/vnd.github.v3.raw" \
-     -H "Cache-Control: no-cache, no-store, must-revalidate" \
-     -H "Pragma: no-cache" \
-     -H "Expires: 0" \
-     -s "https://api.github.com/repos/maifeijihao/file-upload-system/contents/index.html" \
-     -o /opt/file-upload-uuid/index.html
-
-cd /opt/file-upload-uuid && ./restart.sh
+curl -fsSL https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/index.html -o /opt/file-upload-uuid/index.html && cd /opt/file-upload-uuid && sudo ./restart.sh
 ```
 
 

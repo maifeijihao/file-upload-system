@@ -1,8 +1,11 @@
 cd /opt/upload
 cat > server.py << 'EOF'
+# server.py
 from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
 import socket
+import json
+import time
 from config import PASSWORD, START_PORT, find_available_port
 
 app = Flask(__name__)
@@ -12,6 +15,40 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
 
 # 确保上传目录存在
 os.makedirs('uploads', exist_ok=True)
+
+# 元数据文件路径
+METADATA_FILE = os.path.join(app.config['UPLOAD_FOLDER'], 'upload_metadata.json')
+
+def load_metadata():
+    """加载上传元数据"""
+    if os.path.exists(METADATA_FILE):
+        with open(METADATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_metadata(metadata):
+    """保存上传元数据"""
+    with open(METADATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+def set_file_upload_time(filename, timestamp=None):
+    """设置文件的上传时间"""
+    if timestamp is None:
+        timestamp = time.time()
+    metadata = load_metadata()
+    metadata[filename] = timestamp
+    save_metadata(metadata)
+
+def get_file_upload_time(filename):
+    """获取文件的上传时间，如果没有则返回文件修改时间"""
+    metadata = load_metadata()
+    if filename in metadata:
+        return metadata[filename]
+    # 回退到文件修改时间
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(file_path):
+        return os.path.getmtime(file_path)
+    return None
 
 def check_login():
     """检查是否已登录"""
@@ -99,6 +136,10 @@ def upload_file():
         # 保存文件
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         
+        # 记录上传时间
+        upload_timestamp = time.time()
+        set_file_upload_time(filename, upload_timestamp)
+        
         # 获取文件信息
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file_size = os.path.getsize(file_path)
@@ -109,7 +150,8 @@ def upload_file():
             'filename': filename,
             'original_name': original_filename,
             'size': file_size,
-            'url': f'/download/{filename}'
+            'url': f'/download/{filename}',
+            'upload_time': upload_timestamp
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
@@ -124,15 +166,20 @@ def list_files():
     try:
         files = []
         for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            if filename == 'upload_metadata.json':
+                continue
+                
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             
             if os.path.isfile(file_path):
                 file_size = os.path.getsize(file_path)
+                upload_time = get_file_upload_time(filename)
                 files.append({
                     'name': filename,
                     'filename': filename,
                     'size': file_size,
-                    'url': f'/download/{filename}'
+                    'url': f'/download/{filename}',
+                    'upload_time': upload_time
                 })
         
         return jsonify({'success': True, 'files': files}), 200
@@ -174,6 +221,8 @@ if __name__ == '__main__':
     print("支持格式: .zip .rar .7z .tar .gz .tar.gz")
     print("最大大小: 1GB")
     print("=" * 50)
+    
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
     
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 EOF

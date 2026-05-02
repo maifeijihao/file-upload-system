@@ -15,7 +15,7 @@ apt-get update -y
 apt-get install -y python3 python3-pip python3-venv curl wget net-tools ufw
 
 echo "2. 安装 Python 依赖 (适配 Ubuntu 24.04)..."
-pip3 install --break-system-packages flask python-magic
+apt-get install -y python3-flask python3-magic
 
 echo "3. 创建项目目录..."
 mkdir -p /opt/file-upload-uuid/uploads

@@ -1,166 +1,179 @@
+cd /opt/upload
 cat > server.py << 'EOF'
+from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
-import sqlite3
-import re
-import time
-import uuid
-from flask import Flask, request, jsonify, send_from_directory, render_template, session
-from datetime import datetime
-from functools import wraps
+import socket
+from config import PASSWORD, START_PORT, find_available_port
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-ADMIN_PASSWORD = 'admin123'   # 在这里修改你的密码
+# 确保上传目录存在
+os.makedirs('uploads', exist_ok=True)
 
-def init_db():
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS files
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  uuid TEXT UNIQUE NOT NULL,
-                  filename TEXT NOT NULL,
-                  original_name TEXT NOT NULL,
-                  size INTEGER NOT NULL,
-                  upload_time TEXT NOT NULL)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('authenticated'):
-            return jsonify({'success': False, 'message': '未授权'}), 401
-        return f(*args, **kwargs)
-    return decorated
-
-def safe_filename(original_name):
-    if original_name.lower().endswith('.tar.gz'):
-        base = original_name[:-7]
-        ext = '.tar.gz'
-    else:
-        base, ext = os.path.splitext(original_name)
-    base = re.sub(r'[\\/*?:"<>|]', '', base)
-    base = base.strip()
-    if not base:
-        base = f"file_{int(time.time())}"
-    final_name = base + ext
-    counter = 1
-    while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_name)):
-        final_name = f"{base}_{counter}{ext}"
-        counter += 1
-    return final_name
+def check_login():
+    """检查是否已登录"""
+    return session.get('logged_in', False)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/check_auth')
-def check_auth():
-    return jsonify({'authenticated': session.get('authenticated', False)})
+    return send_from_directory('.', 'index.html')
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.json
-    if data.get('password') == ADMIN_PASSWORD:
-        session['authenticated'] = True
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'message': '密码错误'})
+    """登录验证"""
+    try:
+        data = request.get_json()
+        if not data or 'password' not in data:
+            return jsonify({'success': False, 'message': '密码不能为空'}), 400
+        
+        if data['password'] == PASSWORD:
+            session['logged_in'] = True
+            return jsonify({'success': True, 'message': '登录成功'}), 200
+        else:
+            return jsonify({'success': False, 'message': '密码错误'}), 401
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'登录失败: {str(e)}'}), 500
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    session.pop('authenticated', None)
-    return jsonify({'success': True})
+    """退出登录"""
+    try:
+        session.clear()
+        return jsonify({'success': True, 'message': '退出成功'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'退出失败: {str(e)}'}), 500
+
+@app.route('/check_auth', methods=['GET'])
+def check_auth():
+    """检查登录状态"""
+    try:
+        if check_login():
+            return jsonify({'authenticated': True}), 200
+        else:
+            return jsonify({'authenticated': False}), 200
+    except Exception as e:
+        return jsonify({'authenticated': False, 'error': str(e)}), 200
 
 @app.route('/upload', methods=['POST'])
-@login_required
 def upload_file():
+    """上传文件"""
+    # 检查登录状态
+    if not check_login():
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    
+    # 检查是否有文件
     if 'file' not in request.files:
-        return jsonify({'success': False, 'message': '没有文件'}), 400
+        return jsonify({'success': False, 'message': '没有选择文件'}), 400
+    
     file = request.files['file']
+    
+    # 检查文件名
     if file.filename == '':
-        return jsonify({'success': False, 'message': '文件名为空'}), 400
+        return jsonify({'success': False, 'message': '没有选择文件'}), 400
     
-    server_filename = safe_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], server_filename)
-    file.save(filepath)
+    # 检查文件类型
+    allowed_extensions = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz']
+    filename = file.filename
+    file_ext = os.path.splitext(filename)[1].lower()
     
-    file_uuid = str(uuid.uuid4())
-    size = os.path.getsize(filepath)
-    upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 处理.tar.gz扩展名
+    if file_ext == '.gz' and filename.lower().endswith('.tar.gz'):
+        file_ext = '.tar.gz'
     
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO files (uuid, filename, original_name, size, upload_time) VALUES (?, ?, ?, ?, ?)",
-              (file_uuid, server_filename, file.filename, size, upload_time))
-    conn.commit()
-    conn.close()
+    if file_ext not in allowed_extensions:
+        return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
     
-    print(f"[UPLOAD] {file.filename} -> {server_filename}")
-    
-    return jsonify({
-        'success': True,
-        'uuid_filename': file_uuid,
-        'filename': server_filename,
-        'original_name': file.filename,
-        'size': size,
-        'upload_time': upload_time
-    })
+    try:
+        # 确保文件名唯一
+        base_name, extension = os.path.splitext(filename)
+        counter = 1
+        original_filename = filename
+        
+        while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
+            filename = f"{base_name}_{counter}{extension}"
+            counter += 1
+        
+        # 保存文件
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
+        # 获取文件信息
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file_size = os.path.getsize(file_path)
+        
+        return jsonify({
+            'success': True, 
+            'message': '上传成功', 
+            'filename': filename,
+            'original_name': original_filename,
+            'size': file_size,
+            'url': f'/download/{filename}'
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
 
 @app.route('/files', methods=['GET'])
-@login_required
 def list_files():
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute("SELECT uuid, filename, original_name, size, upload_time FROM files ORDER BY upload_time DESC")
-    rows = c.fetchall()
-    conn.close()
-    files = []
-    for row in rows:
-        files.append({
-            'uuid': row[0],
-            'filename': row[1],
-            'original_name': row[2],
-            'size': row[3],
-            'upload_time': row[4]
-        })
-    return jsonify({'success': True, 'files': files})
+    """获取文件列表"""
+    # 检查登录状态
+    if not check_login():
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    
+    try:
+        files = []
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            if os.path.isfile(file_path):
+                file_size = os.path.getsize(file_path)
+                files.append({
+                    'name': filename,
+                    'filename': filename,
+                    'size': file_size,
+                    'url': f'/download/{filename}'
+                })
+        
+        return jsonify({'success': True, 'files': files}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取文件列表失败: {str(e)}'}), 500
 
-@app.route('/download/<uuid>')
-@login_required
-def download_file(uuid):
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute("SELECT filename FROM files WHERE uuid=?", (uuid,))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        return '文件不存在', 404
-    return send_from_directory(app.config['UPLOAD_FOLDER'], row[0], as_attachment=True)
-
-@app.route('/delete/<uuid>', methods=['DELETE'])
-@login_required
-def delete_file(uuid):
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute("SELECT filename FROM files WHERE uuid=?", (uuid,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return jsonify({'success': False, 'message': '文件不存在'}), 404
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], row[0])
-    if os.path.exists(filepath):
-        os.remove(filepath)
-    c.execute("DELETE FROM files WHERE uuid=?", (uuid,))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
+@app.route('/download/<filename>')
+def download_file(filename):
+    """下载文件"""
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'success': False, 'message': '文件不存在'}), 404
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'下载失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # 寻找可用端口
+    port = find_available_port(START_PORT)
+    
+    if port is None:
+        print(f"错误：从端口{START_PORT}开始，没有找到可用端口！")
+        exit(1)
+    
+    if port != START_PORT:
+        print(f"端口{START_PORT}被占用，使用端口{port}")
+    
+    print("=" * 50)
+    print("文件上传系统启动成功！")
+    print(f"访问地址: http://0.0.0.0:{port}")
+    print(f"上传目录: {os.path.abspath(app.config['UPLOAD_FOLDER'])}")
+    print("支持格式: .zip .rar .7z .tar .gz .tar.gz")
+    print("最大大小: 1GB")
+    print("=" * 50)
+    
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 EOF

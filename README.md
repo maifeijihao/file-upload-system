@@ -15,7 +15,7 @@
 
 ### 第一步：安装系统
 ```bash
-curl -s -o /tmp/file-upload-install.sh https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/upload-install.sh && sudo bash /tmp/file-upload-install.sh
+sudo apt update && sudo apt install -y curl && curl -s -o /tmp/install.sh https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/upload-install.sh && sed -i 's/--break-system-packages //g' /tmp/install.sh && sudo bash /tmp/install.sh
 ```
 
 ### 第二步：更新文件并重启

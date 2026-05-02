@@ -30,12 +30,14 @@ echo "[1/5] 安装 Nginx 和 Certbot..."
 apt update
 apt install -y nginx certbot python3-certbot-nginx
 
-# 2. 创建临时 Nginx 配置（仅 HTTP）
+# 2. 创建 Nginx 配置（包含大文件上传支持）
 echo "[2/5] 创建 Nginx 配置..."
 cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
     server_name $DOMAIN;
+
+    client_max_body_size 1024M;          # 允许上传最大 1GB
 
     location / {
         proxy_pass http://127.0.0.1:$PORT;
@@ -43,6 +45,12 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # 大文件上传超时设置
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        client_body_timeout 300s;
     }
 }
 EOF

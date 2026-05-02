@@ -37,7 +37,7 @@ server {
     listen 80;
     server_name $DOMAIN;
 
-    client_max_body_size 4M;          # 允许上传最大 1GB
+    client_max_body_size 1024M;          # 允许上传最大 1GB
 
     location / {
         proxy_pass http://127.0.0.1:$PORT;

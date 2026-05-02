@@ -1,3 +1,4 @@
+cat > server.py << 'EOF'
 import os
 import sqlite3
 import re
@@ -10,10 +11,10 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-ADMIN_PASSWORD = 'admin123'  # 建议修改为强密码
+ADMIN_PASSWORD = 'admin123'   # 在这里修改你的密码
 
 def init_db():
     conn = sqlite3.connect('files.db')
@@ -39,19 +40,15 @@ def login_required(f):
     return decorated
 
 def safe_filename(original_name):
-    """生成安全的文件名，重名时自动添加 _数字"""
-    # 处理 .tar.gz 后缀
     if original_name.lower().endswith('.tar.gz'):
         base = original_name[:-7]
         ext = '.tar.gz'
     else:
         base, ext = os.path.splitext(original_name)
-    # 清理非法字符
     base = re.sub(r'[\\/*?:"<>|]', '', base)
     base = base.strip()
     if not base:
         base = f"file_{int(time.time())}"
-    # 重名处理
     final_name = base + ext
     counter = 1
     while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], final_name)):
@@ -88,25 +85,24 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'success': False, 'message': '文件名为空'}), 400
-
+    
     server_filename = safe_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], server_filename)
     file.save(filepath)
-
+    
     file_uuid = str(uuid.uuid4())
     size = os.path.getsize(filepath)
     upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+    
     conn = sqlite3.connect('files.db')
     c = conn.cursor()
     c.execute("INSERT INTO files (uuid, filename, original_name, size, upload_time) VALUES (?, ?, ?, ?, ?)",
               (file_uuid, server_filename, file.filename, size, upload_time))
     conn.commit()
     conn.close()
-
-    # 控制台调试输出
-    print(f"[UPLOAD] 原始名: {file.filename} -> 存储名: {server_filename}")
-
+    
+    print(f"[UPLOAD] {file.filename} -> {server_filename}")
+    
     return jsonify({
         'success': True,
         'uuid_filename': file_uuid,
@@ -128,8 +124,8 @@ def list_files():
     for row in rows:
         files.append({
             'uuid': row[0],
-            'filename': row[1],          # 服务器实际存储的文件名（例如 很好_1.rar）
-            'original_name': row[2],     # 用户上传时的原始文件名（例如 很好.rar）
+            'filename': row[1],
+            'original_name': row[2],
             'size': row[3],
             'upload_time': row[4]
         })
@@ -166,4 +162,5 @@ def delete_file(uuid):
     return jsonify({'success': True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
+EOF

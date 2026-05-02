@@ -641,15 +641,13 @@
                 if (!response.ok) throw new Error('获取文件列表失败');
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message);
-                // 【关键修改】将后端返回的 filename（服务器实际文件名）保存到 server_filename 字段
-                // 同时保留 uuid、original_name 等原始字段
+                // 【关键修复】将后端返回的 filename（服务器实际文件名）保存到 server_filename 字段
                 currentFiles = (data.files || []).map(file => {
                     const fileId = file.uuid;
                     if (!file._displayTime) {
                         file._displayTime = getStableFileTime(fileId);
                     }
-                    // 统一使用 server_filename 作为显示用的文件名（服务器实际存储名）
-                    file.server_filename = file.filename;   // filename 就是实际名（如 很好_1.rar）
+                    file.server_filename = file.filename;   // filename 就是实际存储名（如 很好_1.rar）
                     return file;
                 });
                 updateDisplay();
@@ -667,7 +665,7 @@
                     items.push({
                         type: 'uploading',
                         id: uploadId,
-                        fileName: upload.file.name,   // 上传中显示原始名，因为服务器还没返回实际名
+                        fileName: upload.file.name,   // 上传中显示原始名
                         fileSize: upload.file.size,
                         progress: upload.progress,
                         uploadId: uploadId,
@@ -677,7 +675,7 @@
                     });
                 }
                 for (let file of currentSessionFiles) {
-                    // 【修改】使用 server_filename（即服务器返回的 filename）作为显示名
+                    // 使用 server_filename（服务器返回的实际文件名）
                     const displayName = file.server_filename || file.original_name || file.name;
                     items.push({
                         type: 'success',
@@ -743,7 +741,7 @@
                 for (let file of sortedFiles) {
                     totalSize += file.size || 0;
                     successCount++;
-                    // 【修改】全部文件列表中也显示服务器实际文件名（server_filename）
+                    // 【关键】全部文件列表中也显示服务器实际文件名（server_filename）
                     const displayName = file.server_filename || file.original_name || file.name;
                     const fileId = file.uuid;
                     html += createFileItemHtml(fileId, displayName, file.size, 'success', 0, null, file._displayTime);
@@ -780,7 +778,6 @@
                     <div class="progress-bar" style="width: ${progress}%"></div>
                 </div>
             ` : '';
-            // 显示文件ID的短标识（取uuid前12位，更友好）
             const shortId = fileId ? fileId.substring(0, 12) : '未知';
             const timeHtml = (status === 'success' && displayTime) ? 
                 `<div class="file-time">上传时间: ${formatTimestamp(displayTime)}</div>` : '';
@@ -803,7 +800,6 @@
             `;
         }
         
-        // 简单的防XSS辅助函数
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/[&<>]/g, function(m) {
@@ -811,8 +807,6 @@
                 if (m === '<') return '&lt;';
                 if (m === '>') return '&gt;';
                 return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-                return c;
             });
         }
         
@@ -881,17 +875,16 @@
                     const fileId = response.uuid_filename;
                     const stableTime = Date.now();
                     getStableFileTime(fileId, stableTime);
-                    // 保存文件信息，注意使用 response.filename（服务器实际存储名）
                     const fileData = {
                         uuid: fileId,
                         original_name: file.name,
-                        server_filename: response.filename,   // 重点：服务器端实际文件名（已处理重名）
+                        server_filename: response.filename,   // 服务器实际名
                         size: file.size,
                         _displayTime: stableTime
                     };
                     currentSessionFiles.push(fileData);
                     activeUploads.delete(uploadId);
-                    loadFiles();  // 重新加载全部文件列表以保持同步
+                    loadFiles();  // 重新加载全部列表以同步
                 } else if (xhr.status === 401) {
                     handleUploadError(uploadId, file, '会话过期，请重新登录');
                     updateAuthStatus();

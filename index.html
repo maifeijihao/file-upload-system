@@ -859,7 +859,6 @@
                     const fileId = response.uuid_filename || uploadId;
                     const stableTime = Date.now();
                     getStableFileTime(fileId, stableTime);
-                    // 关键：使用本地原始文件名（file.name），不使用服务器返回的任何名字
                     const fileData = {
                         id: fileId,
                         name: file.name,

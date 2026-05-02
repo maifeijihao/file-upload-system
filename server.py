@@ -1,3 +1,5 @@
+cd /opt/upload
+cat > server.py << 'EOF'
 from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
 import socket

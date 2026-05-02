@@ -1,349 +1,1254 @@
-mkdir -p templates
-cat > templates/index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文件上传系统</title>
+    <title>upload</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { background-color: #f5f5f5; padding: 20px; max-width: 1200px; margin: 0 auto; }
-        h1 { text-align: center; margin: 20px 0 30px; color: #333; }
-        .upload-area { border: 2px dashed #ccc; border-radius: 8px; padding: 40px 20px; text-align: center; margin-bottom: 30px; background-color: #fff; cursor: pointer; }
-        .upload-area:hover { border-color: #4a90e2; background-color: #f9f9f9; }
-        .upload-btn { background-color: #4a90e2; color: white; border: none; padding: 12px 24px; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; }
-        .file-input { display: none; }
-        .files-container { background-color: #fff; border-radius: 8px; padding: 20px; margin-bottom: 30px; }
-        .stats-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 6px; }
-        .stats-left { display: flex; gap: 25px; }
-        .stat-item { display: flex; align-items: center; gap: 5px; }
-        .view-toggle { display: flex; gap: 10px; }
-        .view-toggle-btn { background: none; border: none; padding: 8px 16px; cursor: pointer; background-color: #f1f1f1; border-radius: 4px; }
-        .view-toggle-btn.active { background-color: #4a90e2; color: white; }
-        .batch-copy-btn { background-color: #9b59b6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-        .batch-copy-current { background-color: #27ae60; }
-        .file-list { max-height: 400px; overflow-y: auto; }
-        .file-item { padding: 12px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .file-name { font-weight: bold; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .file-size { color: #666; font-size: 14px; }
-        .file-uuid { color: #999; font-size: 11px; }
-        .file-time { color: #888; font-size: 10px; }
-        .file-status { font-size: 12px; padding: 2px 6px; border-radius: 3px; margin-left: 10px; }
-        .status-success { background-color: #27ae60; color: white; }
-        .copy-btn { background-color: #7f8c8d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-        .password-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
-        .password-modal-content { background: white; border-radius: 8px; width: 90%; max-width: 400px; }
-        .password-modal-header { background-color: #4a90e2; color: white; padding: 20px; text-align: center; }
-        .password-modal-body { padding: 25px; }
-        .password-input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; }
-        .password-modal-submit { background-color: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-        .auth-status { position: fixed; top: 20px; right: 20px; background-color: #27ae60; color: white; padding: 8px 15px; border-radius: 4px; display: none; }
-        .auth-logout { background-color: #e74c3c; border: none; padding: 4px 8px; margin-left: 10px; cursor: pointer; }
-        .lock-icon { font-size: 24px; color: #ccc; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        h1 {
+            text-align: center;
+            margin: 20px 0 30px;
+            color: #333;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #4a90e2;
+            background-color: #f9f9f9;
+        }
+        
+        .upload-area.dragover {
+            border-color: #4a90e2;
+            background-color: #f0f7ff;
+        }
+        
+        .upload-btn {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .upload-btn:hover {
+            background-color: #3a7bc8;
+        }
+        
+        .upload-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .files-container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stats-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .stats-left {
+            display: flex;
+            gap: 25px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 16px;
+            min-width: 25px;
+            text-align: center;
+        }
+        
+        .file-count {
+            color: #4a90e2;
+        }
+        
+        .total-size {
+            color: #9b59b6;
+        }
+        
+        .success-count {
+            color: #27ae60;
+        }
+        
+        .failed-count {
+            color: #e74c3c;
+        }
+        
+        .stats-right {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .view-toggle {
+            display: flex;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+        
+        .view-toggle-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .view-toggle-btn.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+        
+        .batch-copy-btn {
+            background-color: #9b59b6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .batch-copy-btn:hover {
+            background-color: #8e44ad;
+        }
+        
+        .batch-copy-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .batch-copy-current {
+            background-color: #27ae60;
+        }
+        
+        .batch-copy-current:hover {
+            background-color: #219653;
+        }
+        
+        .file-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+        
+        .file-details {
+            flex: 1;
+            margin-left: 0;
+        }
+        
+        .file-name {
+            font-weight: bold;
+            color: #333;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 5px;
+        }
+        
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .file-uuid {
+            color: #999;
+            font-size: 11px;
+            margin-top: 3px;
+        }
+        
+        .file-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        
+        .status-uploading {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .status-success {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .status-failed {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .copy-btn {
+            background-color: #7f8c8d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .copy-btn:hover {
+            background-color: #6c7b7d;
+        }
+        
+        .cancel-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+        
+        .cancel-btn:hover {
+            background-color: #c0392b;
+        }
+        
+        .empty-message {
+            text-align: center;
+            color: #999;
+            padding: 40px 0;
+        }
+        
+        /* 密码验证弹窗样式 */
+        .password-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .password-modal-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        
+        .password-modal-header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .password-modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .password-modal-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .password-modal-body {
+            padding: 25px;
+        }
+        
+        .password-input-group {
+            margin-bottom: 20px;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .password-input:focus {
+            border-color: #4a90e2;
+            outline: none;
+        }
+        
+        .password-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .password-modal-btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .password-modal-submit {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .password-modal-submit:hover {
+            background-color: #219653;
+        }
+        
+        .password-error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+        
+        .password-error.show {
+            display: block;
+        }
+        
+        /* 已登录状态样式 */
+        .auth-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+        
+        .auth-status.show {
+            display: block;
+        }
+        
+        .auth-logout {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .lock-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #ccc;
+            z-index: 1;
+        }
+        
+        .locked {
+            position: relative;
+        }
+        
+        .locked::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            z-index: 1;
+        }
+        
+        /* 上传进度条 */
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4a90e2 0%, #9b59b6 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .stats-row {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            
+            .stats-left {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 15px;
+            }
+            
+            .stats-right {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .view-toggle {
+                margin-right: 0;
+                justify-content: center;
+            }
+            
+            .file-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            
+            .file-name {
+                max-width: 200px;
+            }
+            
+            .auth-status {
+                position: static;
+                margin-bottom: 15px;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="password-modal-overlay" id="passwordModal">
-    <div class="password-modal-content">
-        <div class="password-modal-header">密码验证</div>
-        <div class="password-modal-body">
-            <input type="password" class="password-input" id="passwordInput" placeholder="请输入访问密码">
-            <button class="password-modal-submit" id="passwordSubmitBtn">验证</button>
-            <div class="password-error" id="passwordError" style="color:red; display:none;">密码错误</div>
+    <!-- 密码验证弹窗 -->
+    <div class="password-modal-overlay" id="passwordModal">
+        <div class="password-modal-content">
+            <div class="password-modal-header">
+                <div class="password-modal-title">密码验证</div>
+                <div class="password-modal-subtitle">请输入访问密码以使用上传功能</div>
+            </div>
+            <div class="password-modal-body">
+                <div class="password-input-group">
+                    <input type="password" class="password-input" id="passwordInput" placeholder="请输入访问密码" autocomplete="current-password">
+                    <div class="password-error" id="passwordError">密码错误，请重试</div>
+                </div>
+                <div class="password-modal-footer">
+                    <button class="password-modal-btn password-modal-submit" id="passwordSubmitBtn">验证</button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-<div class="auth-status" id="authStatus">已通过验证 <button class="auth-logout" id="logoutBtn">退出</button></div>
-<h1>压缩包上传与下载</h1>
-<div class="upload-area" id="uploadBox">
-    <p>拖放文件到此处或点击按钮选择</p>
-    <button class="upload-btn" id="selectFileBtn">选择压缩包文件</button>
-    <input type="file" class="file-input" id="fileInput" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
-</div>
-<div class="files-container">
-    <div class="stats-row">
-        <div class="stats-left">
-            <div class="stat-item">文件数量: <span id="totalFiles">0</span></div>
-            <div class="stat-item">总大小: <span id="totalSize">0</span></div>
-            <div class="stat-item">成功: <span id="successCount">0</span></div>
-            <div class="stat-item">失败: <span id="failedCount">0</span></div>
-        </div>
-        <div class="view-toggle">
-            <button class="view-toggle-btn active" id="currentViewBtn">当前上传</button>
-            <button class="view-toggle-btn" id="allViewBtn">查看所有</button>
-        </div>
-        <button class="batch-copy-btn batch-copy-current" id="batchCopyCurrentBtn">批量复制当前</button>
-        <button class="batch-copy-btn" id="batchCopyAllBtn">批量复制所有</button>
+    
+    <!-- 已登录状态提示 -->
+    <div class="auth-status" id="authStatus">
+        已通过验证
+        <button class="auth-logout" id="logoutBtn">退出</button>
     </div>
-    <div class="file-list" id="fileList">暂无上传文件</div>
-</div>
-<script>
-    const passwordModal = document.getElementById('passwordModal');
-    const passwordInput = document.getElementById('passwordInput');
-    const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
-    const passwordError = document.getElementById('passwordError');
-    const authStatus = document.getElementById('authStatus');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const uploadBox = document.getElementById('uploadBox');
-    const selectFileBtn = document.getElementById('selectFileBtn');
-    const fileInput = document.getElementById('fileInput');
-    const fileList = document.getElementById('fileList');
-    const currentViewBtn = document.getElementById('currentViewBtn');
-    const allViewBtn = document.getElementById('allViewBtn');
-    const batchCopyCurrentBtn = document.getElementById('batchCopyCurrentBtn');
-    const batchCopyAllBtn = document.getElementById('batchCopyAllBtn');
-    const totalFilesSpan = document.getElementById('totalFiles');
-    const totalSizeSpan = document.getElementById('totalSize');
-    const successCountSpan = document.getElementById('successCount');
-    const failedCountSpan = document.getElementById('failedCount');
+    
+    <h1>压缩包上传与下载</h1>
+    
+    <div class="upload-area" id="uploadBox">
+        <p>拖放文件到此处或点击按钮选择</p>
+        <button class="upload-btn" id="selectFileBtn">选择压缩包文件</button>
+        <input type="file" class="file-input" id="fileInput" multiple accept=".zip,.rar,.7z,.tar,.gz,.tar.gz">
+        <div class="lock-icon" id="lockIcon">🔒</div>
+    </div>
+    
+    <div class="files-container" id="filesContainer">
+        <div class="stats-row">
+            <div class="stats-left">
+                <div class="stat-item">
+                    <span class="stat-label">文件数量:</span>
+                    <span class="stat-value file-count" id="totalFiles">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">总大小:</span>
+                    <span class="stat-value total-size" id="totalSize">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">成功:</span>
+                    <span class="stat-value success-count" id="successCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">失败:</span>
+                    <span class="stat-value failed-count" id="failedCount">0</span>
+                </div>
+            </div>
+            <div class="stats-right">
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" id="currentViewBtn">当前上传</button>
+                    <button class="view-toggle-btn" id="allViewBtn">查看所有</button>
+                </div>
+                <button class="batch-copy-btn batch-copy-current" id="batchCopyCurrentBtn" disabled>批量复制当前</button>
+                <button class="batch-copy-btn" id="batchCopyAllBtn" disabled>批量复制所有</button>
+            </div>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="empty-message" id="noFilesMessage">暂无上传文件</div>
+        </div>
+    </div>
 
-    let authenticated = false;
-    let activeUploads = new Map();
-    let failedUploads = [];
-    let currentFiles = [];
-    let currentSessionFiles = [];
-    let currentView = 'current';
-
-    function formatSize(bytes) {
-        if (!bytes) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function formatTime(ts) {
-        if (!ts) return '';
-        const d = new Date(ts);
-        return d.toLocaleString();
-    }
-
-    async function checkAuth() {
-        const res = await fetch('/check_auth');
-        const data = await res.json();
-        return data.authenticated;
-    }
-
-    async function login(pwd) {
-        const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }) });
-        return await res.json();
-    }
-
-    async function logout() {
-        await fetch('/logout', { method: 'POST' });
-    }
-
-    async function loadFiles() {
-        const res = await fetch('/files');
-        if (res.status === 401) return;
-        const data = await res.json();
-        if (data.success) {
-            currentFiles = data.files.map(f => {
-                f.server_filename = f.filename;   // 关键：后端返回的 filename 是实际存储名
-                return f;
-            });
-            updateDisplay();
+    <script>
+        // ==================== DOM 元素 ====================
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordInput = document.getElementById('passwordInput');
+        const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
+        const passwordError = document.getElementById('passwordError');
+        const authStatus = document.getElementById('authStatus');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const uploadBox = document.getElementById('uploadBox');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const batchCopyCurrentBtn = document.getElementById('batchCopyCurrentBtn');
+        const batchCopyAllBtn = document.getElementById('batchCopyAllBtn');
+        const lockIcon = document.getElementById('lockIcon');
+        const currentViewBtn = document.getElementById('currentViewBtn');
+        const allViewBtn = document.getElementById('allViewBtn');
+        
+        // 统计元素
+        const totalFilesEl = document.getElementById('totalFiles');
+        const totalSizeEl = document.getElementById('totalSize');
+        const successCountEl = document.getElementById('successCount');
+        const failedCountEl = document.getElementById('failedCount');
+        
+        // 状态变量
+        let isAuthenticated = false;
+        let activeUploads = new Map();
+        let failedUploads = [];
+        let currentFiles = []; // 从服务器获取的所有文件
+        let currentSessionFiles = []; // 当前会话上传的文件
+        let currentViewMode = 'current'; // 'current' 或 'all'
+        
+        // ==================== 工具函数 ====================
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
-    }
-
-    function updateDisplay() {
-        if (currentView === 'current') {
-            const items = [];
-            for (let [id, up] of activeUploads) {
-                items.push({ type: 'uploading', id, name: up.file.name, size: up.file.size, progress: up.progress, time: up.startTime });
-            }
-            for (let f of currentSessionFiles) {
-                const displayName = f.server_filename || f.original_name;
-                items.push({ type: 'success', id: f.uuid, name: displayName, size: f.size, time: f._displayTime });
-            }
-            for (let i = 0; i < failedUploads.length; i++) {
-                items.push({ type: 'failed', id: 'fail'+i, name: failedUploads[i].name, size: failedUploads[i].size, time: failedUploads[i].failTime });
-            }
-            items.sort((a,b) => (b.time||0) - (a.time||0));
-            if (items.length === 0) { fileList.innerHTML = '<div>暂无上传文件</div>'; updateStats(0,0,0,0); return; }
-            let totalSize = 0, success = 0, failed = 0;
-            let html = '';
-            for (let it of items) {
-                totalSize += it.size || 0;
-                if (it.type === 'success') success++;
-                if (it.type === 'failed') failed++;
-                html += `<div class="file-item">
-                    <div><div class="file-name">${escapeHtml(it.name)} <span class="file-status status-success">${it.type==='uploading'?'上传中':(it.type==='success'?'已上传':'失败')}</span></div>
-                    <div class="file-size">${formatSize(it.size)}</div>
-                    <div class="file-time">${formatTime(it.time)}</div></div>
-                    <div>${it.type==='success'?`<button class="copy-btn" onclick="copyLink('${it.id}','${escapeHtml(it.name)}')">复制链接</button>`:''}</div>
-                </div>`;
-            }
-            fileList.innerHTML = html;
-            updateStats(items.length, totalSize, success, failed);
-        } else {
-            const sorted = [...currentFiles].sort((a,b) => (b._displayTime||0) - (a._displayTime||0));
-            if (sorted.length === 0) { fileList.innerHTML = '<div>暂无文件</div>'; updateStats(0,0,0,0); return; }
-            let totalSize = 0;
-            let html = '';
-            for (let f of sorted) {
-                totalSize += f.size || 0;
-                const displayName = f.server_filename || f.original_name;
-                html += `<div class="file-item">
-                    <div><div class="file-name">${escapeHtml(displayName)} <span class="file-status status-success">已上传</span></div>
-                    <div class="file-size">${formatSize(f.size)}</div>
-                    <div class="file-time">上传时间: ${formatTime(f._displayTime)}</div></div>
-                    <div><button class="copy-btn" onclick="copyLink('${f.uuid}','${escapeHtml(displayName)}')">复制链接</button></div>
-                </div>`;
-            }
-            fileList.innerHTML = html;
-            updateStats(sorted.length, totalSize, sorted.length, 0);
+        
+        function getFileExtension(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (filename.toLowerCase().endsWith('.tar.gz')) return '.tar.gz';
+            return '.' + ext;
         }
-    }
-
-    function updateStats(total, size, success, failed) {
-        totalFilesSpan.innerText = total;
-        totalSizeSpan.innerText = formatSize(size);
-        successCountSpan.innerText = success;
-        failedCountSpan.innerText = failed;
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    window.copyLink = async function(uuid, name) {
-        const url = `${window.location.origin}/download/${uuid}`;
-        await navigator.clipboard.writeText(url);
-        alert(`复制成功: ${name}\n${url}`);
-    };
-
-    async function uploadFile(file) {
-        const ext = file.name.split('.').pop().toLowerCase();
-        if (!['zip','rar','7z','tar','gz'].includes(ext) && !file.name.endsWith('.tar.gz')) {
-            alert('不支持此文件类型');
-            return;
-        }
-        const uploadId = Date.now() + '_' + Math.random();
-        activeUploads.set(uploadId, { file, progress: 0, startTime: Date.now() });
-        updateDisplay();
-        const fd = new FormData();
-        fd.append('file', file);
-        const xhr = new XMLHttpRequest();
-        xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-                const percent = Math.round(e.loaded / e.total * 100);
-                const up = activeUploads.get(uploadId);
-                if (up) up.progress = percent;
-                updateDisplay();
+        
+        // ==================== 认证相关 ====================
+        async function checkAuth() {
+            try {
+                const response = await fetch('/check_auth');
+                if (!response.ok) throw new Error('Network error');
+                const data = await response.json();
+                return data.authenticated || false;
+            } catch (error) {
+                console.error('检查认证失败:', error);
+                return false;
             }
-        };
-        xhr.onload = () => {
-            if (xhr.status === 200) {
-                const resp = JSON.parse(xhr.responseText);
-                if (resp.success) {
-                    currentSessionFiles.push({
-                        uuid: resp.uuid_filename,
-                        original_name: file.name,
-                        server_filename: resp.filename,
-                        size: file.size,
-                        _displayTime: Date.now()
-                    });
-                } else {
-                    failedUploads.push({ name: file.name, size: file.size, failTime: Date.now(), error: resp.message });
-                }
+        }
+        
+        async function login(password) {
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('登录失败:', error);
+                return { success: false, message: '网络错误' };
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                return true;
+            } catch (error) {
+                console.error('登出失败:', error);
+                return false;
+            }
+        }
+        
+        async function updateAuthStatus() {
+            isAuthenticated = await checkAuth();
+            
+            if (isAuthenticated) {
+                passwordModal.style.display = 'none';
+                authStatus.classList.add('show');
+                uploadBox.classList.remove('locked');
+                lockIcon.style.display = 'none';
+                selectFileBtn.disabled = false;
+                uploadBox.style.cursor = 'pointer';
+                selectFileBtn.style.cursor = 'pointer';
+                await loadFiles();
             } else {
-                failedUploads.push({ name: file.name, size: file.size, failTime: Date.now(), error: '上传失败' });
+                passwordModal.style.display = 'flex';
+                authStatus.classList.remove('show');
+                uploadBox.classList.add('locked');
+                lockIcon.style.display = 'block';
+                selectFileBtn.disabled = true;
+                uploadBox.style.cursor = 'not-allowed';
+                selectFileBtn.style.cursor = 'not-allowed';
+                showEmptyState('请先通过密码验证');
+                updateStats(0, 0, 0, 0);
             }
-            activeUploads.delete(uploadId);
-            loadFiles(); // 重新拉取全部列表
-            updateDisplay();
-        };
-        xhr.onerror = () => {
-            failedUploads.push({ name: file.name, size: file.size, failTime: Date.now(), error: '网络错误' });
-            activeUploads.delete(uploadId);
-            updateDisplay();
-        };
-        xhr.open('POST', '/upload');
-        xhr.send(fd);
-    }
-
-    async function batchCopyCurrent() {
-        if (currentSessionFiles.length === 0) return alert('无当前文件');
-        let links = '';
-        currentSessionFiles.forEach((f,i) => {
-            links += `${i+1}. ${f.server_filename || f.original_name}\n${location.origin}/download/${f.uuid}\n\n`;
-        });
-        await navigator.clipboard.writeText(links);
-        alert(`已复制 ${currentSessionFiles.length} 个链接`);
-    }
-
-    async function batchCopyAll() {
-        if (currentFiles.length === 0) return alert('无文件');
-        let links = '';
-        currentFiles.forEach((f,i) => {
-            links += `${i+1}. ${f.server_filename || f.original_name}\n${location.origin}/download/${f.uuid}\n\n`;
-        });
-        await navigator.clipboard.writeText(links);
-        alert(`已复制 ${currentFiles.length} 个链接`);
-    }
-
-    async function init() {
-        authenticated = await checkAuth();
-        if (authenticated) {
-            passwordModal.style.display = 'none';
-            authStatus.style.display = 'block';
-            await loadFiles();
-        } else {
-            passwordModal.style.display = 'flex';
-            authStatus.style.display = 'none';
         }
-    }
-
-    passwordSubmitBtn.onclick = async () => {
-        const pwd = passwordInput.value;
-        const res = await login(pwd);
-        if (res.success) {
-            authenticated = true;
-            passwordModal.style.display = 'none';
-            authStatus.style.display = 'block';
-            await loadFiles();
-        } else {
-            passwordError.style.display = 'block';
+        
+        // ==================== 文件管理 ====================
+        async function loadFiles() {
+            try {
+                const response = await fetch('/files');
+                if (response.status === 401) {
+                    await updateAuthStatus();
+                    return;
+                }
+                
+                if (!response.ok) throw new Error('获取文件列表失败');
+                
+                const data = await response.json();
+                if (!data.success) throw new Error(data.message);
+                
+                currentFiles = data.files || [];
+                updateDisplay();
+                
+            } catch (error) {
+                console.error('加载文件失败:', error);
+                showEmptyState('加载文件列表失败');
+            }
         }
-    };
-    logoutBtn.onclick = async () => {
-        await logout();
-        authenticated = false;
-        passwordModal.style.display = 'flex';
-        authStatus.style.display = 'none';
-        currentFiles = [];
-        currentSessionFiles = [];
-        activeUploads.clear();
-        failedUploads = [];
-        updateDisplay();
-    };
-    selectFileBtn.onclick = () => fileInput.click();
-    fileInput.onchange = (e) => {
-        for (let f of e.target.files) uploadFile(f);
-        fileInput.value = '';
-    };
-    uploadBox.ondragover = (e) => { e.preventDefault(); uploadBox.style.borderColor = '#4a90e2'; };
-    uploadBox.ondragleave = () => { uploadBox.style.borderColor = '#ccc'; };
-    uploadBox.ondrop = (e) => {
-        e.preventDefault();
-        uploadBox.style.borderColor = '#ccc';
-        for (let f of e.dataTransfer.files) uploadFile(f);
-    };
-    currentViewBtn.onclick = () => { currentView = 'current'; currentViewBtn.classList.add('active'); allViewBtn.classList.remove('active'); updateDisplay(); };
-    allViewBtn.onclick = () => { currentView = 'all'; currentViewBtn.classList.remove('active'); allViewBtn.classList.add('active'); updateDisplay(); };
-    batchCopyCurrentBtn.onclick = batchCopyCurrent;
-    batchCopyAllBtn.onclick = batchCopyAll;
-
-    init();
-</script>
+        
+        function updateDisplay() {
+            const filesToDisplay = currentViewMode === 'current' ? currentSessionFiles : currentFiles;
+            displayFiles(filesToDisplay);
+        }
+        
+        function displayFiles(files) {
+            if (!files || files.length === 0) {
+                showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
+                updateStats(0, 0, 0, 0);
+                return;
+            }
+            
+            let totalSize = 0;
+            let successCount = 0;
+            let html = '';
+            
+            // 显示当前上传的文件（包括上传中和已上传的）
+            if (currentViewMode === 'current') {
+                // 显示上传中的文件
+                activeUploads.forEach((upload, uploadId) => {
+                    const file = upload.file;
+                    totalSize += file.size || 0;
+                    
+                    html += createFileItemHtml(
+                        uploadId,
+                        file.name,
+                        file.size,
+                        'uploading',
+                        upload.progress || 0
+                    );
+                });
+                
+                // 显示当前会话已上传的文件
+                files.forEach(file => {
+                    if (!activeUploads.has(file.id)) {
+                        totalSize += file.size || 0;
+                        successCount++;
+                        
+                        const displayName = file.original_name || file.name || file.filename;
+                        const fileId = file.uuid || file.filename;
+                        
+                        html += createFileItemHtml(
+                            fileId,
+                            displayName,
+                            file.size,
+                            'success'
+                        );
+                    }
+                });
+                
+                // 显示失败的文件
+                failedUploads.forEach((file, index) => {
+                    totalSize += file.size || 0;
+                    
+                    html += createFileItemHtml(
+                        'failed-' + index,
+                        file.name,
+                        file.size,
+                        'failed'
+                    );
+                });
+            } else {
+                // 显示所有文件
+                files.forEach(file => {
+                    totalSize += file.size || 0;
+                    successCount++;
+                    
+                    const displayName = file.original_name || file.name || file.filename;
+                    const fileId = file.uuid || file.filename;
+                    
+                    html += createFileItemHtml(
+                        fileId,
+                        displayName,
+                        file.size,
+                        'success'
+                    );
+                });
+            }
+            
+            fileList.innerHTML = html;
+            
+            // 更新统计信息
+            const totalCount = currentViewMode === 'current' 
+                ? activeUploads.size + files.length + failedUploads.length
+                : files.length;
+            
+            const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
+            
+            updateStats(totalCount, totalSize, successCount, failedCount);
+            
+            // 更新批量复制按钮状态
+            const hasFiles = currentViewMode === 'current' 
+                ? (activeUploads.size + files.length + failedUploads.length) > 0
+                : files.length > 0;
+                
+            const hasAllFiles = currentFiles.length > 0;
+            
+            batchCopyCurrentBtn.disabled = !hasFiles;
+            batchCopyAllBtn.disabled = !hasAllFiles;
+        }
+        
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
+            const fileExt = getFileExtension(fileName).toLowerCase();
+            const fileSizeFormatted = formatFileSize(fileSize || 0);
+            
+            // 状态文本
+            let statusText = '';
+            let statusClass = '';
+            let actionButtons = '';
+            
+            if (status === 'uploading') {
+                statusText = '上传中';
+                statusClass = 'status-uploading';
+                actionButtons = `
+                    <button class="cancel-btn" onclick="cancelUpload('${fileId}')">取消</button>
+                `;
+            } else if (status === 'success') {
+                statusText = '已上传';
+                statusClass = 'status-success';
+                actionButtons = `
+                    <button class="copy-btn" onclick="copyLink('${fileId}', '${fileName}')">复制链接</button>
+                `;
+            } else if (status === 'failed') {
+                statusText = '上传失败';
+                statusClass = 'status-failed';
+                actionButtons = '';
+            }
+            
+            // 进度条
+            const progressBar = status === 'uploading' ? `
+                <div class="progress-container" style="display: block;">
+                    <div class="progress-bar" style="width: ${progress}%"></div>
+                </div>
+            ` : '';
+            
+            // 移除了图标部分
+            return `
+                <div class="file-item" data-id="${fileId}">
+                    <div class="file-info">
+                        <div class="file-details">
+                            <div class="file-name" title="${fileName}">
+                                ${fileName}
+                                <span class="file-status ${statusClass}">${statusText}</span>
+                            </div>
+                            <div class="file-size">${fileSizeFormatted}</div>
+                            <div class="file-uuid">
+                                文件ID: ${fileId.substring(0, 8)}...
+                            </div>
+                            ${progressBar}
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function showEmptyState(message = '暂无文件') {
+            fileList.innerHTML = `
+                <div class="empty-message">
+                    <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
+                    <h3>${message}</h3>
+                    <p>${message.includes('验证') ? '请先输入密码验证身份' : '上传文件后，它们会显示在这里'}</p>
+                </div>
+            `;
+        }
+        
+        function updateStats(total, size, success, failed) {
+            totalFilesEl.textContent = total;
+            totalSizeEl.textContent = formatFileSize(size);
+            successCountEl.textContent = success;
+            failedCountEl.textContent = failed;
+        }
+        
+        // ==================== 文件上传 ====================
+        async function uploadFile(file) {
+            // 验证文件类型
+            const allowedExts = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'];
+            const fileExt = getFileExtension(file.name);
+            
+            if (!allowedExts.includes(fileExt)) {
+                alert(`不支持的文件格式: ${fileExt}\n请上传压缩文件 (ZIP, RAR, 7Z, TAR, GZ)`);
+                failedUploads.push({ name: file.name, error: '不支持的文件格式', size: file.size });
+                updateDisplay();
+                return;
+            }
+            
+            // 验证文件大小 (1GB)
+            if (file.size > 1024 * 1024 * 1024) {
+                alert(`文件太大: ${formatFileSize(file.size)}\n最大支持 1GB`);
+                failedUploads.push({ name: file.name, error: '文件超过大小限制', size: file.size });
+                updateDisplay();
+                return;
+            }
+            
+            // 创建上传项目
+            const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // 存储上传信息
+            activeUploads.set(uploadId, { 
+                file: file, 
+                progress: 0,
+                id: uploadId
+            });
+            
+            // 更新显示
+            updateDisplay();
+            
+            // 准备表单数据
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // 创建 XMLHttpRequest
+            const xhr = new XMLHttpRequest();
+            
+            // 进度事件
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    const upload = activeUploads.get(uploadId);
+                    if (upload) {
+                        upload.progress = percent;
+                        updateDisplay();
+                    }
+                }
+            });
+            
+            // 完成事件
+            xhr.addEventListener('load', () => {
+                handleUploadComplete(uploadId, xhr, file);
+            });
+            
+            // 错误事件
+            xhr.addEventListener('error', () => {
+                handleUploadError(uploadId, file, '网络错误');
+            });
+            
+            // 存储xhr引用
+            const upload = activeUploads.get(uploadId);
+            upload.xhr = xhr;
+            
+            // 发送请求
+            xhr.open('POST', '/upload');
+            xhr.send(formData);
+        }
+        
+        function handleUploadComplete(uploadId, xhr, file) {
+            const upload = activeUploads.get(uploadId);
+            if (!upload) return;
+            
+            try {
+                const response = JSON.parse(xhr.responseText);
+                
+                if (xhr.status === 200 && response.success) {
+                    // 上传成功
+                    const fileId = response.uuid_filename || uploadId;
+                    const fileData = {
+                        id: fileId,
+                        name: file.name,
+                        original_name: file.name,
+                        size: file.size,
+                        uuid: fileId,
+                        filename: fileId
+                    };
+                    
+                    // 添加到当前会话文件列表
+                    currentSessionFiles.push(fileData);
+                    
+                    // 从上传列表中移除
+                    activeUploads.delete(uploadId);
+                    
+                    // 重新加载所有文件
+                    loadFiles();
+                    
+                } else if (xhr.status === 401) {
+                    // 未授权
+                    handleUploadError(uploadId, file, '会话过期，请重新登录');
+                    updateAuthStatus();
+                } else {
+                    // 其他错误
+                    const errorMsg = response.message || '上传失败';
+                    handleUploadError(uploadId, file, errorMsg);
+                }
+            } catch (error) {
+                handleUploadError(uploadId, file, '服务器响应错误');
+            }
+        }
+        
+        function handleUploadError(uploadId, file, error) {
+            const upload = activeUploads.get(uploadId);
+            if (!upload) return;
+            
+            // 添加到失败列表
+            failedUploads.push({ 
+                name: file.name, 
+                error: error,
+                size: file.size
+            });
+            
+            // 从上传列表中移除
+            activeUploads.delete(uploadId);
+            
+            // 更新显示
+            updateDisplay();
+        }
+        
+        // ==================== 全局函数 ====================
+        window.cancelUpload = function(uploadId) {
+            const upload = activeUploads.get(uploadId);
+            if (upload && upload.xhr) {
+                upload.xhr.abort();
+                handleUploadError(uploadId, upload.file, '已取消');
+            }
+        };
+        
+        window.copyLink = async function(fileId, displayName) {
+            const fileUrl = `${window.location.origin}/download/${fileId}`;
+            
+            try {
+                await navigator.clipboard.writeText(fileUrl);
+                alert(`✅ 链接已复制到剪贴板\n\n文件名: ${displayName}\n链接: ${fileUrl}`);
+            } catch (err) {
+                // 备用方法
+                const textarea = document.createElement('textarea');
+                textarea.value = fileUrl;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    alert(`✅ 链接已复制到剪贴板\n\n文件名: ${displayName}\n链接: ${fileUrl}`);
+                } catch (err2) {
+                    alert('❌ 复制失败，请手动复制链接:\n' + fileUrl);
+                }
+                document.body.removeChild(textarea);
+            }
+        };
+        
+        // ==================== 批量复制功能 ====================
+        async function batchCopyCurrent() {
+            if (currentViewMode !== 'current') {
+                // 切换到当前视图
+                switchView('current');
+                // 等待视图更新
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            const filesToCopy = [...currentSessionFiles];
+            
+            if (filesToCopy.length === 0) {
+                alert('当前没有可复制的文件');
+                return;
+            }
+            
+            const serverUrl = window.location.origin;
+            let allLinks = '';
+            
+            filesToCopy.forEach((file, index) => {
+                const displayName = file.original_name || file.name || file.filename;
+                const fileId = file.uuid || file.filename;
+                const fileUrl = `${serverUrl}/download/${fileId}`;
+                allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
+            });
+            
+            try {
+                await navigator.clipboard.writeText(allLinks);
+                alert(`✅ 已复制 ${filesToCopy.length} 个当前文件的链接到剪贴板！`);
+            } catch (err) {
+                // 备用方法
+                const textarea = document.createElement('textarea');
+                textarea.value = allLinks;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert(`✅ 已复制 ${filesToCopy.length} 个当前文件的链接到剪贴板！`);
+            }
+        }
+        
+        async function batchCopyAll() {
+            if (currentFiles.length === 0) {
+                alert('没有文件可以复制');
+                return;
+            }
+            
+            const serverUrl = window.location.origin;
+            let allLinks = '';
+            
+            currentFiles.forEach((file, index) => {
+                const displayName = file.original_name || file.name || file.filename;
+                const fileId = file.uuid || file.filename;
+                const fileUrl = `${serverUrl}/download/${fileId}`;
+                allLinks += `${index + 1}. ${displayName}\n${fileUrl}\n\n`;
+            });
+            
+            try {
+                await navigator.clipboard.writeText(allLinks);
+                alert(`✅ 已复制 ${currentFiles.length} 个所有文件的链接到剪贴板！`);
+            } catch (err) {
+                // 备用方法
+                const textarea = document.createElement('textarea');
+                textarea.value = allLinks;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert(`✅ 已复制 ${currentFiles.length} 个所有文件的链接到剪贴板！`);
+            }
+        }
+        
+        // ==================== 视图切换 ====================
+        function switchView(view) {
+            currentViewMode = view;
+            
+            // 更新按钮状态
+            if (view === 'current') {
+                currentViewBtn.classList.add('active');
+                allViewBtn.classList.remove('active');
+            } else {
+                currentViewBtn.classList.remove('active');
+                allViewBtn.classList.add('active');
+            }
+            
+            // 更新显示
+            updateDisplay();
+        }
+        
+        // ==================== 事件监听 ====================
+        // 密码验证
+        passwordSubmitBtn.addEventListener('click', async () => {
+            const password = passwordInput.value.trim();
+            if (!password) {
+                passwordError.textContent = '请输入密码';
+                passwordError.classList.add('show');
+                return;
+            }
+            
+            const result = await login(password);
+            
+            if (result.success) {
+                await updateAuthStatus();
+                passwordError.classList.remove('show');
+                passwordInput.value = '';
+            } else {
+                passwordError.textContent = result.message || '密码错误';
+                passwordError.classList.add('show');
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        });
+        
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                passwordSubmitBtn.click();
+            }
+        });
+        
+        // 退出登录
+        logoutBtn.addEventListener('click', async () => {
+            await logout();
+            await updateAuthStatus();
+        });
+        
+        // 选择文件
+        selectFileBtn.addEventListener('click', () => {
+            if (!isAuthenticated) {
+                alert('请先通过密码验证');
+                return;
+            }
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (!isAuthenticated) {
+                alert('请先通过密码验证');
+                return;
+            }
+            
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            files.forEach(file => {
+                uploadFile(file);
+            });
+            
+            fileInput.value = ''; // 清除选择，允许选择相同文件
+        });
+        
+        // 拖放上传
+        uploadBox.addEventListener('dragover', (e) => {
+            if (!isAuthenticated) {
+                e.preventDefault();
+                return;
+            }
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+        
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+        
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            
+            if (!isAuthenticated) {
+                alert('请先通过密码验证');
+                return;
+            }
+            
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length === 0) return;
+            
+            files.forEach(file => {
+                uploadFile(file);
+            });
+        });
+        
+        // 批量复制当前
+        batchCopyCurrentBtn.addEventListener('click', batchCopyCurrent);
+        
+        // 批量复制所有
+        batchCopyAllBtn.addEventListener('click', batchCopyAll);
+        
+        // 视图切换
+        currentViewBtn.addEventListener('click', () => switchView('current'));
+        allViewBtn.addEventListener('click', () => switchView('all'));
+        
+        // ==================== 初始化 ====================
+        async function init() {
+            await updateAuthStatus();
+            
+            // 每30秒刷新文件列表
+            setInterval(async () => {
+                if (isAuthenticated && currentViewMode === 'all') {
+                    await loadFiles();
+                }
+            }, 30000);
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
-EOF

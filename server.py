@@ -2,20 +2,92 @@ cd /opt/upload
 cat > server.py << 'EOF'
 from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
+import hashlib
 import socket
-from config import PASSWORD, START_PORT, find_available_port
+import uuid
+import json
+import time
+from datetime import datetime, timezone, timedelta  # 新增导入用于时区处理
+from config import verify_password, find_available_port, DEFAULT_PORT
 
 app = Flask(__name__)
+
+# 设置密钥（用于session）
 app.secret_key = os.urandom(24)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+
+UPLOAD_FOLDER = 'uploads'
+MAPPING_FILE = 'file_mapping.json'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
 
 # 确保上传目录存在
-os.makedirs('uploads', exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def check_login():
+# ========== 新增：定义北京时间时区 ==========
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def format_beijing_time(timestamp):
+    """将时间戳格式化为北京时间字符串"""
+    dt = datetime.fromtimestamp(timestamp, tz=BEIJING_TZ)
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+def require_auth():
     """检查是否已登录"""
-    return session.get('logged_in', False)
+    return session.get('authenticated', False)
+
+def generate_uuid_filename(original_filename):
+    """生成UUID文件名，保留扩展名"""
+    _, extension = os.path.splitext(original_filename)
+    if original_filename.lower().endswith('.tar.gz'):
+        extension = '.tar.gz'
+    file_uuid = str(uuid.uuid4())
+    return f"{file_uuid}{extension}"
+
+def save_file_mapping(uuid_filename, original_filename, file_size):
+    """保存文件映射关系"""
+    mapping_file = os.path.join(app.config['UPLOAD_FOLDER'], '..', MAPPING_FILE)
+    mappings = {}
+    if os.path.exists(mapping_file):
+        try:
+            with open(mapping_file, 'r', encoding='utf-8') as f:
+                mappings = json.load(f)
+        except:
+            pass
+    mappings[uuid_filename] = {
+        'original_name': original_filename,
+        'size': file_size,
+        'upload_time': time.time()  # 存储 UTC 时间戳
+    }
+    try:
+        with open(mapping_file, 'w', encoding='utf-8') as f:
+            json.dump(mappings, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+    return mappings
+
+def get_original_filename(uuid_filename):
+    """获取原始文件名"""
+    mapping_file = os.path.join(app.config['UPLOAD_FOLDER'], '..', MAPPING_FILE)
+    if os.path.exists(mapping_file):
+        try:
+            with open(mapping_file, 'r', encoding='utf-8') as f:
+                mappings = json.load(f)
+            if uuid_filename in mappings:
+                return mappings[uuid_filename].get('original_name', uuid_filename)
+        except:
+            pass
+    return uuid_filename
+
+def get_all_file_mappings():
+    """获取所有文件映射"""
+    mapping_file = os.path.join(app.config['UPLOAD_FOLDER'], '..', MAPPING_FILE)
+    if os.path.exists(mapping_file):
+        try:
+            with open(mapping_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
 
 @app.route('/')
 def index():
@@ -23,157 +95,141 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    """登录验证"""
-    try:
-        data = request.get_json()
-        if not data or 'password' not in data:
-            return jsonify({'success': False, 'message': '密码不能为空'}), 400
-        
-        if data['password'] == PASSWORD:
-            session['logged_in'] = True
-            return jsonify({'success': True, 'message': '登录成功'}), 200
-        else:
-            return jsonify({'success': False, 'message': '密码错误'}), 401
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'登录失败: {str(e)}'}), 500
+    data = request.json
+    if not data or 'password' not in data:
+        return jsonify({'success': False, 'message': '密码不能为空'}), 400
+    if verify_password(data['password']):
+        session['authenticated'] = True
+        return jsonify({'success': True}), 200
+    else:
+        return jsonify({'success': False, 'message': '密码错误'}), 401
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    """退出登录"""
-    try:
-        session.clear()
-        return jsonify({'success': True, 'message': '退出成功'}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'退出失败: {str(e)}'}), 500
+    session.pop('authenticated', None)
+    return jsonify({'success': True}), 200
 
-@app.route('/check_auth', methods=['GET'])
+@app.route('/check_auth')
 def check_auth():
-    """检查登录状态"""
-    try:
-        if check_login():
-            return jsonify({'authenticated': True}), 200
-        else:
-            return jsonify({'authenticated': False}), 200
-    except Exception as e:
-        return jsonify({'authenticated': False, 'error': str(e)}), 200
+    return jsonify({'authenticated': session.get('authenticated', False)}), 200
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """上传文件"""
-    # 检查登录状态
-    if not check_login():
-        return jsonify({'success': False, 'message': '请先登录'}), 401
-    
-    # 检查是否有文件
+    if not require_auth():
+        return jsonify({'success': False, 'message': '未授权访问'}), 401
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有选择文件'}), 400
-    
     file = request.files['file']
-    
-    # 检查文件名
     if file.filename == '':
         return jsonify({'success': False, 'message': '没有选择文件'}), 400
-    
-    # 检查文件类型
-    allowed_extensions = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz']
-    filename = file.filename
-    file_ext = os.path.splitext(filename)[1].lower()
-    
-    # 处理.tar.gz扩展名
-    if file_ext == '.gz' and filename.lower().endswith('.tar.gz'):
+
+    file.seek(0, 2)
+    file_size = file.tell()
+    file.seek(0)
+    if file_size > 1024 * 1024 * 1024:
+        return jsonify({'success': False, 'message': '文件超过1GB大小限制'}), 400
+
+    allowed_extensions = {'.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'}
+    original_filename = file.filename
+    file_ext = os.path.splitext(original_filename)[1].lower()
+    if file_ext == '.gz' and original_filename.lower().endswith('.tar.gz'):
         file_ext = '.tar.gz'
-    
     if file_ext not in allowed_extensions:
         return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
-    
+
     try:
-        # 确保文件名唯一
-        base_name, extension = os.path.splitext(filename)
+        uuid_filename = generate_uuid_filename(original_filename)
+        base_name, extension = os.path.splitext(uuid_filename)
         counter = 1
-        original_filename = filename
-        
-        while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
-            filename = f"{base_name}_{counter}{extension}"
+        while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], uuid_filename)):
+            uuid_filename = f"{base_name}_{counter}{extension}"
             counter += 1
-        
-        # 保存文件
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        
-        # 获取文件信息
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file_size = os.path.getsize(file_path)
-        
+
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], uuid_filename)
+        file.save(save_path)
+
+        # 保存映射
+        save_file_mapping(uuid_filename, original_filename, file_size)
+
+        # 获取当前北京时间字符串
+        upload_time_beijing = format_beijing_time(time.time())
+
         return jsonify({
-            'success': True, 
-            'message': '上传成功', 
-            'filename': filename,
+            'success': True,
+            'message': '上传成功',
+            'uuid_filename': uuid_filename,
             'original_name': original_filename,
             'size': file_size,
-            'url': f'/download/{filename}'
+            'upload_time': upload_time_beijing   # 返回北京时间
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
 
-@app.route('/files', methods=['GET'])
+@app.route('/files')
 def list_files():
-    """获取文件列表"""
-    # 检查登录状态
-    if not check_login():
-        return jsonify({'success': False, 'message': '请先登录'}), 401
-    
-    try:
-        files = []
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            
-            if os.path.isfile(file_path):
-                file_size = os.path.getsize(file_path)
-                files.append({
-                    'name': filename,
-                    'filename': filename,
-                    'size': file_size,
-                    'url': f'/download/{filename}'
-                })
-        
-        return jsonify({'success': True, 'files': files}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取文件列表失败: {str(e)}'}), 500
+    if not require_auth():
+        return jsonify({'success': False, 'message': '未授权访问'}), 401
+
+    mappings = get_all_file_mappings()
+    files = []
+    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.isfile(path):
+            file_info = mappings.get(filename, {})
+            original_name = file_info.get('original_name', filename)
+            file_size = file_info.get('size', os.path.getsize(path))
+
+            # 获取上传时间戳
+            upload_ts = file_info.get('upload_time')
+            if upload_ts is None:
+                upload_ts = os.path.getmtime(path)
+            # 转换为北京时间字符串
+            upload_time_str = format_beijing_time(upload_ts)
+
+            files.append({
+                'uuid': filename,
+                'name': original_name,
+                'original_name': original_name,
+                'size': file_size,
+                'filename': filename,
+                'url': f'/download/{filename}',
+                'is_uuid': True,
+                'upload_time': upload_time_str
+            })
+
+    return jsonify({'success': True, 'files': files}), 200
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    """下载文件"""
     try:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        if not os.path.exists(file_path):
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if not os.path.exists(path):
             return jsonify({'success': False, 'message': '文件不存在'}), 404
-        
+        original_filename = get_original_filename(filename)
         return send_file(
-            file_path,
+            path,
             as_attachment=True,
-            download_name=filename
+            download_name=original_filename,
+            mimetype='application/octet-stream'
         )
     except Exception as e:
         return jsonify({'success': False, 'message': f'下载失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    # 寻找可用端口
-    port = find_available_port(START_PORT)
-    
+    port = find_available_port(DEFAULT_PORT)
     if port is None:
-        print(f"错误：从端口{START_PORT}开始，没有找到可用端口！")
+        print(f"错误：从端口{DEFAULT_PORT}开始，没有找到可用端口！")
         exit(1)
-    
-    if port != START_PORT:
-        print(f"端口{START_PORT}被占用，使用端口{port}")
-    
-    print("=" * 50)
-    print("文件上传系统启动成功！")
+    if port != DEFAULT_PORT:
+        print(f"端口{DEFAULT_PORT}被占用，使用端口{port}")
+    print("文件上传系统启动成功！(UUID版本)")
+    print(f"项目目录: {os.path.dirname(os.path.abspath(__file__))}")
     print(f"访问地址: http://0.0.0.0:{port}")
-    print(f"上传目录: {os.path.abspath(app.config['UPLOAD_FOLDER'])}")
-    print("支持格式: .zip .rar .7z .tar .gz .tar.gz")
-    print("最大大小: 1GB")
-    print("=" * 50)
-    
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    print(f"上传目录: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')}")
+    print(f"文件映射: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file_mapping.json')}")
+    print("")
+    print("✅ 文件上传系统已启用UUID文件名模式！")
+    print("   上传的文件会自动重命名为UUID格式，但下载时仍显示原始文件名。")
+    print("   前端显示原始文件名，下载链接使用UUID格式。")
+    app.run(host='0.0.0.0', port=port, debug=False)
 EOF

@@ -719,20 +719,32 @@
             displayFiles(filesToDisplay);
         }
         
+        // ==================== 核心：显示文件（含排序） ====================
         function displayFiles(files) {
             if (!files || files.length === 0) {
                 showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
                 updateStats(0, 0, 0, 0);
                 return;
             }
-            
+
+            // ===== 新增：对已上传成功的文件按 upload_time 降序排序（最新在前） =====
+            // 只排序成功的文件，不影响 activeUploads 和 failedUploads 的顺序
+            const sortedSuccessFiles = [...files].sort((a, b) => {
+                // 如果有文件没有 upload_time，放到最后
+                if (!a.upload_time && !b.upload_time) return 0;
+                if (!a.upload_time) return 1;   // a 无时间 → 排后面
+                if (!b.upload_time) return -1;  // b 无时间 → 排后面
+                // 按时间字符串降序（最新的在前）
+                return b.upload_time.localeCompare(a.upload_time);
+            });
+
             let totalSize = 0;
             let successCount = 0;
             let html = '';
             
             // 显示当前上传的文件（包括上传中和已上传的）
             if (currentViewMode === 'current') {
-                // 显示上传中的文件
+                // 1. 上传中的文件（优先显示在最前面）
                 activeUploads.forEach((upload, uploadId) => {
                     const file = upload.file;
                     totalSize += file.size || 0;
@@ -747,15 +759,15 @@
                     );
                 });
                 
-                // 显示当前会话已上传的文件
-                files.forEach(file => {
+                // 2. 当前会话已上传成功的文件（已按时间降序）
+                sortedSuccessFiles.forEach(file => {
                     if (!activeUploads.has(file.id)) {
                         totalSize += file.size || 0;
                         successCount++;
                         
                         const displayName = file.original_name || file.name || file.filename;
                         const fileId = file.uuid || file.filename;
-                        const uploadTime = file.upload_time || '';  // 从文件对象中获取
+                        const uploadTime = file.upload_time || '';
                         
                         html += createFileItemHtml(
                             fileId,
@@ -768,7 +780,7 @@
                     }
                 });
                 
-                // 显示失败的文件
+                // 3. 失败的文件（放最后）
                 failedUploads.forEach((file, index) => {
                     totalSize += file.size || 0;
                     
@@ -782,8 +794,8 @@
                     );
                 });
             } else {
-                // 显示所有文件（来自服务器）
-                files.forEach(file => {
+                // 查看所有文件（全部已上传成功，按时间降序）
+                sortedSuccessFiles.forEach(file => {
                     totalSize += file.size || 0;
                     successCount++;
                     
@@ -806,8 +818,8 @@
             
             // 更新统计信息
             const totalCount = currentViewMode === 'current' 
-                ? activeUploads.size + files.length + failedUploads.length
-                : files.length;
+                ? activeUploads.size + sortedSuccessFiles.length + failedUploads.length
+                : sortedSuccessFiles.length;
             
             const failedCount = currentViewMode === 'current' ? failedUploads.length : 0;
             
@@ -815,8 +827,8 @@
             
             // 更新批量复制按钮状态
             const hasFiles = currentViewMode === 'current' 
-                ? (activeUploads.size + files.length + failedUploads.length) > 0
-                : files.length > 0;
+                ? (activeUploads.size + sortedSuccessFiles.length + failedUploads.length) > 0
+                : sortedSuccessFiles.length > 0;
                 
             const hasAllFiles = currentFiles.length > 0;
             

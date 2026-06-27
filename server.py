@@ -128,17 +128,13 @@ def list_files():
             
             if os.path.isfile(file_path):
                 file_size = os.path.getsize(file_path)
-                # ========== 新增：获取文件创建时间 ==========
-                upload_time = os.path.getctime(file_path)   # 秒级时间戳
                 files.append({
                     'name': filename,
                     'filename': filename,
                     'size': file_size,
-                    'url': f'/download/{filename}',
-                    'upload_time': upload_time   # 新增字段
+                    'url': f'/download/{filename}'
                 })
-        # ========== 新增：按时间倒序（最新在前） ==========
-        files.sort(key=lambda x: x['upload_time'], reverse=True)
+        
         return jsonify({'success': True, 'files': files}), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取文件列表失败: {str(e)}'}), 500

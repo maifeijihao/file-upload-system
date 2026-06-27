@@ -335,7 +335,8 @@ import hashlib
 import socket
 import uuid
 import json
-import time  # 新增导入 time 用于格式化时间
+import time
+from datetime import datetime, timezone, timedelta  # 新增：时区处理
 from config import verify_password, find_available_port, DEFAULT_PORT
 
 app = Flask(__name__)
@@ -350,6 +351,14 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# ========== 定义北京时间时区 ==========
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def format_beijing_time(timestamp):
+    """将时间戳格式化为北京时间字符串"""
+    dt = datetime.fromtimestamp(timestamp, tz=BEIJING_TZ)
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 def require_auth():
     """检查是否已登录"""
@@ -472,8 +481,8 @@ def upload_file():
         # 保存映射（已记录时间戳）
         save_file_mapping(uuid_filename, original_filename, file_size)
 
-        # 获取刚记录的时间戳并格式化为字符串，用于返回给前端
-        upload_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        # 获取当前北京时间字符串
+        upload_time_str = format_beijing_time(time.time())
 
         return jsonify({
             'success': True,
@@ -481,7 +490,7 @@ def upload_file():
             'uuid_filename': uuid_filename,
             'original_name': original_filename,
             'size': file_size,
-            'upload_time': upload_time_str   # 返回格式化的时间
+            'upload_time': upload_time_str   # 返回北京时间
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
@@ -500,11 +509,12 @@ def list_files():
             original_name = file_info.get('original_name', filename)
             file_size = file_info.get('size', os.path.getsize(path))
 
-            # 获取上传时间：优先从映射中读取，如果没有则用文件修改时间
+            # 获取上传时间戳
             upload_ts = file_info.get('upload_time')
             if upload_ts is None:
                 upload_ts = os.path.getmtime(path)
-            upload_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(upload_ts))
+            # 转换为北京时间字符串
+            upload_time_str = format_beijing_time(upload_ts)
 
             files.append({
                 'uuid': filename,
@@ -514,7 +524,7 @@ def list_files():
                 'filename': filename,
                 'url': f'/download/{filename}',
                 'is_uuid': True,
-                'upload_time': upload_time_str   # 加上时间字段
+                'upload_time': upload_time_str   # 北京时间
             })
 
     return jsonify({'success': True, 'files': files}), 200

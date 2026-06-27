@@ -711,7 +711,6 @@
             displayFiles(filesToDisplay);
         }
         
-        // ==================== 修改后的 displayFiles（传递 upload_time） ====================
         function displayFiles(files) {
             if (!files || files.length === 0) {
                 showEmptyState(currentViewMode === 'current' ? '当前没有上传文件' : '暂无文件');
@@ -735,8 +734,7 @@
                         file.name,
                         file.size,
                         'uploading',
-                        upload.progress || 0,
-                        null   // 上传中无时间
+                        upload.progress || 0
                     );
                 });
                 
@@ -749,14 +747,11 @@
                         const displayName = file.original_name || file.name || file.filename;
                         const fileId = file.uuid || file.filename;
                         
-                        // 传递 upload_time（后端已返回）
                         html += createFileItemHtml(
                             fileId,
                             displayName,
                             file.size,
-                            'success',
-                            100,
-                            file.upload_time
+                            'success'
                         );
                     }
                 });
@@ -769,9 +764,7 @@
                         'failed-' + index,
                         file.name,
                         file.size,
-                        'failed',
-                        0,
-                        null
+                        'failed'
                     );
                 });
             } else {
@@ -787,9 +780,7 @@
                         fileId,
                         displayName,
                         file.size,
-                        'success',
-                        100,
-                        file.upload_time
+                        'success'
                     );
                 });
             }
@@ -816,8 +807,7 @@
             batchCopyAllBtn.disabled = !hasAllFiles;
         }
         
-        // ==================== 修改后的 createFileItemHtml（增加 uploadTime 参数和显示） ====================
-        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0, uploadTime = null) {
+        function createFileItemHtml(fileId, fileName, fileSize, status, progress = 0) {
             const fileExt = getFileExtension(fileName).toLowerCase();
             const fileSizeFormatted = formatFileSize(fileSize || 0);
             
@@ -851,13 +841,6 @@
                 </div>
             ` : '';
             
-            // 格式化上传时间
-            let timeStr = '未知时间';
-            if (uploadTime) {
-                const d = new Date(uploadTime * 1000);  // 后端返回秒级时间戳
-                timeStr = d.toLocaleString('zh-CN', { hour12: false });
-            }
-            
             // 移除了图标部分
             return `
                 <div class="file-item" data-id="${fileId}">
@@ -871,8 +854,6 @@
                             <div class="file-uuid">
                                 文件ID: ${fileId.substring(0, 8)}...
                             </div>
-                            <!-- 新增上传时间显示 -->
-                            <div class="file-uuid" style="color: #555;">上传时间：${timeStr}</div>
                             ${progressBar}
                         </div>
                     </div>

@@ -919,7 +919,7 @@
         // ==================== 文件上传 ====================
         async function uploadFile(file) {
             // 验证文件类型
-            const allowedExts = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'];
+            const allowedExts = ['.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz', '.apk'];
             const fileExt = getFileExtension(file.name);
             
             if (!allowedExts.includes(fileExt)) {

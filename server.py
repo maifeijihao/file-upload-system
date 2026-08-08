@@ -1,5 +1,3 @@
-cd /opt/upload
-cat > server.py << 'EOF'
 from flask import Flask, request, send_file, jsonify, send_from_directory, session
 import os
 import hashlib
@@ -7,7 +5,7 @@ import socket
 import uuid
 import json
 import time
-from datetime import datetime, timezone, timedelta  # 新增：用于处理时区
+from datetime import datetime, timezone, timedelta
 from config import verify_password, find_available_port, DEFAULT_PORT
 
 app = Flask(__name__)
@@ -57,7 +55,7 @@ def save_file_mapping(uuid_filename, original_filename, file_size):
     mappings[uuid_filename] = {
         'original_name': original_filename,
         'size': file_size,
-        'upload_time': time.time()  # 记录上传时刻的时间戳
+        'upload_time': time.time()
     }
     try:
         with open(mapping_file, 'w', encoding='utf-8') as f:
@@ -161,44 +159,15 @@ def upload_file():
             'uuid_filename': uuid_filename,
             'original_name': original_filename,
             'size': file_size,
-            'upload_time': upload_time_str   # 返回北京时间
+            'upload_time': upload_time_str
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
 
 @app.route('/files')
 def list_files():
-    if not require_auth():
-        return jsonify({'success': False, 'message': '未授权访问'}), 401
-
-    mappings = get_all_file_mappings()
-    files = []
-    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.isfile(path):
-            file_info = mappings.get(filename, {})
-            original_name = file_info.get('original_name', filename)
-            file_size = file_info.get('size', os.path.getsize(path))
-
-            # 获取上传时间戳
-            upload_ts = file_info.get('upload_time')
-            if upload_ts is None:
-                upload_ts = os.path.getmtime(path)
-            # 转换为北京时间字符串
-            upload_time_str = format_beijing_time(upload_ts)
-
-            files.append({
-                'uuid': filename,
-                'name': original_name,
-                'original_name': original_name,
-                'size': file_size,
-                'filename': filename,
-                'url': f'/download/{filename}',
-                'is_uuid': True,
-                'upload_time': upload_time_str   # 北京时间
-            })
-
-    return jsonify({'success': True, 'files': files}), 200
+    # 隐藏文件列表接口，直接返回 404
+    return jsonify({'success': False, 'message': 'Not Found'}), 404
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -233,5 +202,3 @@ if __name__ == '__main__':
     print("   上传的文件会自动重命名为UUID格式，但下载时仍显示原始文件名。")
     print("   前端显示原始文件名，下载链接使用UUID格式。")
     app.run(host='0.0.0.0', port=port, debug=False)
-
-EOF

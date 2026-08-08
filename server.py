@@ -128,7 +128,7 @@ def upload_file():
     if file_size > 1024 * 1024 * 1024:
         return jsonify({'success': False, 'message': '文件超过1GB大小限制'}), 400
 
-    allowed_extensions = {'.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz'}
+    allowed_extensions = {'.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz', '.apk'}
     original_filename = file.filename
     file_ext = os.path.splitext(original_filename)[1].lower()
     if file_ext == '.gz' and original_filename.lower().endswith('.tar.gz'):

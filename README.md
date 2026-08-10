@@ -18,7 +18,7 @@
 sudo apt update && sudo apt install -y curl && curl -s -o /tmp/install.sh https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/upload-install.sh && sed -i 's/--break-system-packages //g' /tmp/install.sh && sudo bash /tmp/install.sh
 ```
 
-### 第二步：更新文件并重启
+### 第二步：更新index并重启
 ```bash
 curl -fsSL https://raw.githubusercontent.com/maifeijihao/file-upload-system/main/index.html -o /opt/file-upload-uuid/index.html && cd /opt/file-upload-uuid && sudo ./restart.sh
 ```

@@ -336,7 +336,7 @@ import socket
 import uuid
 import json
 import time
-from datetime import datetime, timezone, timedelta  # 新增：时区处理
+from datetime import datetime, timezone, timedelta
 from config import verify_password, find_available_port, DEFAULT_PORT
 
 app = Flask(__name__)
@@ -352,7 +352,7 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ========== 定义北京时间时区 ==========
+# ========== 新增：定义北京时间时区 ==========
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 def format_beijing_time(timestamp):
@@ -386,7 +386,7 @@ def save_file_mapping(uuid_filename, original_filename, file_size):
     mappings[uuid_filename] = {
         'original_name': original_filename,
         'size': file_size,
-        'upload_time': time.time()  # 记录上传时刻的时间戳
+        'upload_time': time.time()
     }
     try:
         with open(mapping_file, 'w', encoding='utf-8') as f:
@@ -490,7 +490,7 @@ def upload_file():
             'uuid_filename': uuid_filename,
             'original_name': original_filename,
             'size': file_size,
-            'upload_time': upload_time_str   # 返回北京时间
+            'upload_time': upload_time_str
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
@@ -509,11 +509,9 @@ def list_files():
             original_name = file_info.get('original_name', filename)
             file_size = file_info.get('size', os.path.getsize(path))
 
-            # 获取上传时间戳
             upload_ts = file_info.get('upload_time')
             if upload_ts is None:
                 upload_ts = os.path.getmtime(path)
-            # 转换为北京时间字符串
             upload_time_str = format_beijing_time(upload_ts)
 
             files.append({
@@ -524,7 +522,7 @@ def list_files():
                 'filename': filename,
                 'url': f'/download/{filename}',
                 'is_uuid': True,
-                'upload_time': upload_time_str   # 北京时间
+                'upload_time': upload_time_str
             })
 
     return jsonify({'success': True, 'files': files}), 200

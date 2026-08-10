@@ -166,8 +166,35 @@ def upload_file():
 
 @app.route('/files')
 def list_files():
-    # 隐藏文件列表接口，直接返回 404
-    return jsonify({'success': False, 'message': 'Not Found'}), 404
+    if not require_auth():
+        return jsonify({'success': False, 'message': '未授权访问'}), 401
+
+    mappings = get_all_file_mappings()
+    files = []
+    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.isfile(path):
+            file_info = mappings.get(filename, {})
+            original_name = file_info.get('original_name', filename)
+            file_size = file_info.get('size', os.path.getsize(path))
+
+            upload_ts = file_info.get('upload_time')
+            if upload_ts is None:
+                upload_ts = os.path.getmtime(path)
+            upload_time_str = format_beijing_time(upload_ts)
+
+            files.append({
+                'uuid': filename,
+                'name': original_name,
+                'original_name': original_name,
+                'size': file_size,
+                'filename': filename,
+                'url': f'/download/{filename}',
+                'is_uuid': True,
+                'upload_time': upload_time_str
+            })
+
+    return jsonify({'success': True, 'files': files}), 200
 
 @app.route('/download/<filename>')
 def download_file(filename):
